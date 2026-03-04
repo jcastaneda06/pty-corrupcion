@@ -10,7 +10,6 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { GoogleGenerativeAI, type GenerativeModel } from 'https://esm.sh/@google/generative-ai';
 
 // ── Search queries ────────────────────────────────────────────────────────────
 // Each query is sent to both Google News and Bing News RSS, giving two independent
@@ -338,7 +337,7 @@ async function isDuplicate(
 // one consolidated finding instead of many duplicates.
 
 async function clusterItemsIntoGroups(
-  model: GenerativeModel,
+  apiKey: string,
   items: RssItem[]
 ): Promise<RssItem[][]> {
   if (items.length <= 1) return items.map(item => [item]);
@@ -348,7 +347,7 @@ async function clusterItemsIntoGroups(
     .join('\n');
 
   try {
-    const text = await callGemini(model, `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
+    const text = await callGemini(apiKey, `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
 
 ${itemList}
 
@@ -423,22 +422,31 @@ async function upsertPerson(
   return data.id;
 }
 
-// ── Gemini call with one retry on 429 ────────────────────────────────────────
+// ── Gemini REST call with one retry on 429 ───────────────────────────────────
 
-async function callGemini(model: GenerativeModel, prompt: string): Promise<string> {
-  try {
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-  } catch (e: unknown) {
-    const err = e as { status?: number; message?: string };
-    if (err?.status === 429 || String(err?.message).includes('429')) {
-      console.warn('Rate limited — retrying in 6s');
-      await new Promise(r => setTimeout(r, 6000));
-      const result = await model.generateContent(prompt);
-      return result.response.text();
-    }
-    throw e;
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
+async function callGemini(apiKey: string, prompt: string): Promise<string> {
+  const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
+  const headers = { 'Content-Type': 'application/json' };
+
+  let res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: 'POST', headers, body,
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (res.status === 429) {
+    console.warn('Rate limited — retrying in 6s');
+    await new Promise(r => setTimeout(r, 6000));
+    res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: 'POST', headers, body,
+      signal: AbortSignal.timeout(30_000),
+    });
   }
+
+  if (!res.ok) throw new Error(`Gemini API error: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return data.candidates[0].content.parts[0].text as string;
 }
 
 // ── Process a group of articles through Claude and persist to DB ───────────────
@@ -447,7 +455,7 @@ async function callGemini(model: GenerativeModel, prompt: string): Promise<strin
 
 async function processArticle(
   supabase: ReturnType<typeof createClient>,
-  model: GenerativeModel,
+  apiKey: string,
   items: RssItem[],
   content: ArticleContent
 ): Promise<boolean> {
@@ -455,7 +463,7 @@ async function processArticle(
 
   let extracted: Record<string, unknown>;
   try {
-    const rawText = await callGemini(model, buildExtractionPrompt(content, primaryItem.url));
+    const rawText = await callGemini(apiKey, buildExtractionPrompt(content, primaryItem.url));
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON object in Gemini response');
     extracted = JSON.parse(jsonMatch[0]);
@@ -588,7 +596,6 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const model = new GoogleGenerativeAI(geminiKey).getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const startTime = Date.now();
   let articlesFound = 0;
@@ -620,7 +627,7 @@ Deno.serve(async (req: Request) => {
     console.log(`${queue.length} unique articles to process`);
 
     // Step 3: cluster items into topic groups (one Claude call)
-    const groups = await clusterItemsIntoGroups(model, queue);
+    const groups = await clusterItemsIntoGroups(geminiKey, queue);
 
     // Step 4: process groups in parallel batches, respecting a time budget
     const BATCH_SIZE = 6;
@@ -636,7 +643,7 @@ Deno.serve(async (req: Request) => {
         articlesFound += group.length;
         console.log(`  Processing group (${group.length} article${group.length > 1 ? 's' : ''}): ${group[0].title || group[0].url}`);
         const content = await resolveGroupContent(group);
-        return processArticle(supabase, model, group, content);
+        return processArticle(supabase, geminiKey, group, content);
       }));
       findingsCreated += results.filter(Boolean).length;
     }
