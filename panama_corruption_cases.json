@@ -1,0 +1,187 @@
+{
+  "metadata": {
+    "title": "Corruption Cases in Panama - Typology and Frequency",
+    "description": "Classification of corruption types in Panama by frequency, based on research from Transparency International, CIEPS, Panama's Attorney General, and investigative journalism sources.",
+    "last_updated": "2026-03-03",
+    "sources": [
+      "https://www.transparency.org/en/countries/panama",
+      "https://havanatimes.org/features/panama-the-cost-of-two-decades-of-corruption/",
+      "https://ministeriopublico.gob.pa/casos-complejos/casos-fiscalia-de-anticorrupcion/",
+      "https://tupolitica.com/analisis-panama/casos-corrupcion-panama.html/",
+      "https://cieps.org.pa/desafios-en-el-estudio-de-la-corrupcion-en-panama/",
+      "https://insightcrime.org/panama-organized-crime-news/panama/",
+      "https://www.u4.no/publications/panama-overview-of-corruption-risks-in-the-judiciary-and-prosecution-service",
+      "https://www.worlddata.info/america/panama/corruption.php"
+    ],
+    "corruption_perception_index_2024": {
+      "score": 33,
+      "rank_out_of_180": 114,
+      "note": "Lowest score in 12 years, on par with Bosnia-Herzegovina, Nepal, and Sierra Leone"
+    },
+    "estimated_stolen_funds_2004_2024_usd": "5,104,000,000"
+  },
+  "most_common": [
+    {
+      "rank": 1,
+      "type": "Fraude en Contratación Pública",
+      "type_en": "Public Procurement Fraud",
+      "description": "Manipulation of public bidding processes, including direct contracting without competition, collusion with contractors, overpriced contracts, and unjustified contract modifications that inflate costs after award.",
+      "frequency": "Very High",
+      "sectors_affected": ["construction", "public works", "health", "education", "technology"],
+      "notable_cases": [
+        {
+          "name": "Odebrecht",
+          "summary": "Brazilian firm paid $59M in bribes (2010–2014) to secure contracts; cost overruns exceeded $2 billion USD.",
+          "amounts_usd": "2,000,000,000+"
+        },
+        {
+          "name": "FCC Construcción",
+          "summary": "Spanish company Fomento de Construcciones y Contratas paid over 82 million euros in bribes for Panamanian contracts."
+        },
+        {
+          "name": "Servicios Blue Apple",
+          "summary": "Eight people sentenced in 2023, including ex-minister Federico Suárez (14 years; $27.4M fine)."
+        },
+        {
+          "name": "Panama Ports Company",
+          "summary": "State losses estimated at over $1.2 billion USD due to unfavorable contractual modifications."
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "type": "Peculado / Malversación de Fondos Públicos",
+      "type_en": "Embezzlement of Public Funds",
+      "description": "Diversion of public funds by officials for personal benefit. Common in the Social Security Fund (CSS), municipal governments, Ministry of Education, and Ministry of Housing.",
+      "frequency": "Very High",
+      "sectors_affected": ["social security", "municipalities", "education", "housing"],
+      "notable_cases": [
+        {
+          "name": "Casos Gobierno Cortizo (2024)",
+          "summary": "Panama's Anti-Corruption Prosecutors Office opened multiple embezzlement cases from the Cortizo administration (2019–2024)."
+        },
+        {
+          "name": "Ricardo Martinelli",
+          "summary": "Former president accused in 2018 of embezzling millions in public funds used to acquire luxury properties."
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "type": "Lavado de Dinero",
+      "type_en": "Money Laundering",
+      "description": "Panama is a global money laundering hub due to its dollarized economy, large banking sector, Colón Free Zone (one of the world's largest free-trade zones), and permissive financial regulation historically.",
+      "frequency": "Very High",
+      "sectors_affected": ["banking", "real estate", "free trade zones", "shell companies", "law firms"],
+      "notable_cases": [
+        {
+          "name": "Panama Papers (2016)",
+          "summary": "Leak of 11.5 million files from law firm Mossack Fonseca exposed global use of Panamanian shell companies to conceal wealth. 28 defendants acquitted by Panamanian court in 2024."
+        },
+        {
+          "name": "Martinelli Linares (Odebrecht)",
+          "summary": "Luis Enrique and Ricardo Martinelli Linares pleaded guilty in the US to money laundering conspiracy, receiving $28M+ in bribe proceeds via offshore accounts."
+        },
+        {
+          "name": "Vuelo de Dinero / PDVSA",
+          "summary": "A $1.2B corruption scheme linking Venezuelan state oil company PDVSA to Panamanian financial networks, prosecuted in the US, Spain, Argentina, and Panama."
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "type": "Soborno / Cohecho",
+      "type_en": "Bribery of Public Officials",
+      "description": "Payments to officials to secure government contracts, obtain permits, or influence regulatory and judicial decisions. Particularly prevalent in construction, customs, and the judiciary.",
+      "frequency": "High",
+      "sectors_affected": ["judiciary", "customs", "permits and licenses", "public works"],
+      "notable_cases": []
+    },
+    {
+      "rank": 5,
+      "type": "Tráfico de Influencias / Nepotismo",
+      "type_en": "Influence Peddling and Nepotism",
+      "description": "Partisan appointments in public institutions, using personal and political connections to steer contracts, jobs, or resources. Documented extensively in IFARHU, AIG, municipalities, and the Ministry of Education.",
+      "frequency": "High",
+      "sectors_affected": ["all public institutions", "municipalities", "state-owned enterprises"],
+      "notable_cases": []
+    },
+    {
+      "rank": 6,
+      "type": "Corrupción en Fuerzas de Seguridad",
+      "type_en": "Security Forces Corruption",
+      "description": "Drug trafficking organizations have historically infiltrated Panama's police and security services, recruiting or bribing officers to enable drug shipments and other criminal activity.",
+      "frequency": "High",
+      "sectors_affected": ["national police", "border control", "ports", "airports"],
+      "notable_cases": []
+    },
+    {
+      "rank": 7,
+      "type": "Abuso durante Emergencias (COVID-19)",
+      "type_en": "Emergency Fund Abuse (COVID-19 and Crisis Situations)",
+      "description": "During the COVID-19 pandemic, emergency procurement rules were exploited: direct contracting without competition, purchases at inflated prices, acquisitions misaligned with market value, and opaque distribution of supplies.",
+      "frequency": "High (situational)",
+      "sectors_affected": ["health", "emergency procurement", "logistics"],
+      "notable_cases": []
+    },
+    {
+      "rank": 8,
+      "type": "Captura del Estado / Corrupción Política Sistémica",
+      "type_en": "State Capture / Systemic Political Corruption",
+      "description": "Private or political interests systematically controlling government institutions, regulatory bodies, and legislative processes to extract rents and redirect public resources.",
+      "frequency": "High",
+      "sectors_affected": ["legislature", "regulatory bodies", "judiciary", "executive"],
+      "notable_cases": []
+    }
+  ],
+  "least_common": [
+    {
+      "rank": 1,
+      "type": "Corrupción de Baja Escala / Coimas Burocráticas",
+      "type_en": "Petty Corruption / Small Bureaucratic Bribes",
+      "description": "Small payments to low-level officials to speed up routine procedures. Panama has notably low levels of petty corruption compared to other countries in the region, attributed to low bureaucratic red tape and relatively high GDP per capita.",
+      "frequency": "Low",
+      "note": "Panama is explicitly characterized by high grand corruption and low petty corruption in academic and policy literature."
+    },
+    {
+      "rank": 2,
+      "type": "Fraude Electoral",
+      "type_en": "Electoral Fraud",
+      "description": "Direct manipulation of election results or vote counts. While vote-buying and political patronage exist, outright electoral fraud in vote tallying is rarely documented.",
+      "frequency": "Low"
+    },
+    {
+      "rank": 3,
+      "type": "Corrupción Judicial de Bajo Nivel",
+      "type_en": "Low-Level Judicial Corruption",
+      "description": "Bribery of individual lower court judges or clerks by private citizens. High-level judicial capture is more common; direct bribery of individual judges in ordinary citizen cases is less documented.",
+      "frequency": "Low-Medium"
+    },
+    {
+      "rank": 4,
+      "type": "Extorsión Directa a Ciudadanos por Funcionarios",
+      "type_en": "Direct Extortion of Citizens by Officials",
+      "description": "Systematic extortion of ordinary citizens by public servants demanding payments for basic services. Less prevalent than in neighboring countries due to Panama's relatively higher income levels and lower bureaucratic friction.",
+      "frequency": "Low"
+    },
+    {
+      "rank": 5,
+      "type": "Corrupción en Sector Privado Doméstico",
+      "type_en": "Private Sector Domestic Corruption",
+      "description": "Corruption between purely private companies (excluding their dealings with the state). While corporate governance issues exist, private-to-private corruption is much less documented than public sector corruption.",
+      "frequency": "Low"
+    }
+  ],
+  "summary": {
+    "dominant_pattern": "Grand corruption — large-scale schemes involving the state, major contractors, and political elites — is the defining feature of Panamanian corruption. Public procurement fraud is by far the most impactful and frequent type.",
+    "least_common_pattern": "Petty corruption (small bureaucratic bribes) is unusually rare for a Latin American country of Panama's income level, mainly because citizens interact less frequently with bureaucratic checkpoints.",
+    "key_structural_drivers": [
+      "Weak institutional oversight and impunity",
+      "Dollarized economy attracting illicit capital",
+      "Colon Free Zone enabling opaque trade flows",
+      "Permissive corporate registry historically used for shell companies",
+      "Political financing gaps enabling quid-pro-quo relationships",
+      "Revolving door between private sector and public officials"
+    ]
+  }
+}
