@@ -81,13 +81,16 @@ function bingNewsRssUrl(query: string): string {
 }
 
 // Bing RSS items link to bing.com/news/apiclick.aspx?url=ENCODED_REAL_URL
-// This extracts and returns the actual article URL.
+// When extracted from RSS XML, & is encoded as &amp;, so we must unescape first
+// before URL parsing — otherwise searchParams.get('url') returns null.
 function resolveBingUrl(url: string): string {
   try {
-    const parsed = new URL(url);
+    // Unescape XML entities present when the URL comes from RSS XML content
+    const unescaped = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    const parsed = new URL(unescaped);
     if (parsed.hostname.includes('bing.com')) {
-      const actual = parsed.searchParams.get('url');
-      if (actual) return decodeURIComponent(actual);
+      const actual = parsed.searchParams.get('url'); // already percent-decoded by URLSearchParams
+      if (actual) return actual;
     }
   } catch { /* ignore */ }
   return url;
@@ -335,12 +338,12 @@ Extrae TODAS las personas mencionadas y sus relaciones aunque el documento no se
 async function isDuplicate(
   supabase: ReturnType<typeof createClient>,
   title: string,
-  url: string
+  urls: string[]
 ): Promise<boolean> {
   const { data: byUrl } = await supabase
     .from('sources')
     .select('id')
-    .eq('url', url)
+    .in('url', urls)
     .limit(1);
   if (byUrl && byUrl.length > 0) return true;
 
@@ -351,6 +354,81 @@ async function isDuplicate(
     .ilike('title', `${titleStart}%`)
     .limit(1);
   return !!(byTitle && byTitle.length > 0);
+}
+
+// ── Cluster RSS items into topic groups via Claude ────────────────────────────
+// One Claude call groups all items so articles about the same case produce
+// one consolidated finding instead of many duplicates.
+
+async function clusterItemsIntoGroups(
+  anthropic: Anthropic,
+  items: RssItem[]
+): Promise<RssItem[][]> {
+  if (items.length <= 1) return items.map(item => [item]);
+
+  const itemList = items
+    .map((item, i) => `[${i}] ${item.title}${item.description ? ' — ' + item.description.slice(0, 120) : ''}`)
+    .join('\n');
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-6',
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
+
+${itemList}
+
+Responde ÚNICAMENTE con JSON válido (sin markdown ni comentarios):
+{"groups":[[0,3,7],[1,2],[4],[5,6],...]}
+
+Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`,
+      }],
+    });
+
+    const block = message.content[0];
+    if (block.type !== 'text') throw new Error('no text block');
+    const jsonMatch = block.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON object in clustering response');
+    const { groups } = JSON.parse(jsonMatch[0]) as { groups: number[][] };
+
+    const seen = new Set<number>();
+    const result: RssItem[][] = [];
+    for (const group of groups) {
+      const valid = group.filter(i => Number.isInteger(i) && i >= 0 && i < items.length && !seen.has(i));
+      valid.forEach(i => seen.add(i));
+      if (valid.length > 0) result.push(valid.map(i => items[i]));
+    }
+    // Append any items Claude missed
+    for (let i = 0; i < items.length; i++) {
+      if (!seen.has(i)) result.push([items[i]]);
+    }
+
+    const grouped = result.filter(g => g.length > 1).length;
+    console.log(`Clustered ${items.length} articles into ${result.length} groups (${grouped} multi-article groups)`);
+    return result;
+  } catch (e) {
+    console.warn('Clustering failed, treating each item independently:', e);
+    return items.map(item => [item]);
+  }
+}
+
+// ── Resolve and merge content for a group of items ────────────────────────────
+
+async function resolveGroupContent(group: RssItem[]): Promise<ArticleContent> {
+  const contents = await Promise.all(group.map(item => resolveRssContent(item)));
+
+  if (group.length === 1) return contents[0];
+
+  const title = contents.find(c => c.title)?.title || group[0].title;
+  const description = contents.find(c => c.description)?.description || group[0].description;
+  const body = contents
+    .map((c, i) => `=== FUENTE ${i + 1} (${group[i].outlet}) ===\n${c.body}`)
+    .join('\n\n')
+    .slice(0, 10000);
+
+  return { title, description, body };
 }
 
 // ── Helper: upsert person ─────────────────────────────────────────────────────
@@ -377,20 +455,24 @@ async function upsertPerson(
   return data.id;
 }
 
-// ── Process one article through Claude and persist to DB ──────────────────────
+// ── Process a group of articles through Claude and persist to DB ───────────────
+// All items in the group are about the same case; one finding is created with
+// one source row per verified URL.
 
 async function processArticle(
   supabase: ReturnType<typeof createClient>,
   anthropic: Anthropic,
-  item: RssItem,
+  items: RssItem[],
   content: ArticleContent
 ): Promise<boolean> {
+  const primaryItem = items[0];
+
   let extracted: Record<string, unknown>;
   try {
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 2048,
-      messages: [{ role: 'user', content: buildExtractionPrompt(content, item.url) }],
+      messages: [{ role: 'user', content: buildExtractionPrompt(content, primaryItem.url) }],
     });
     const block = message.content[0];
     if (block.type !== 'text') return false;
@@ -398,25 +480,22 @@ async function processArticle(
     const rawText = block.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
     extracted = JSON.parse(rawText);
   } catch (e) {
-    console.error(`  Claude/parse error for ${item.url}:`, e);
+    console.error(`  Claude/parse error for ${primaryItem.url}:`, e);
     return false;
   }
 
   if (!extracted.is_corruption_related) return false;
   if (!extracted.title || !extracted.summary) return false;
 
-  const dup = await isDuplicate(supabase, String(extracted.title), item.url);
+  const dup = await isDuplicate(supabase, String(extracted.title), items.map(i => i.url));
   if (dup) {
     console.log(`  Duplicate, skipping: ${extracted.title}`);
     return false;
   }
 
-  const urlOk = await verifyUrl(item.url);
-  const verifiedSourceUrl = urlOk ? item.url : null;
-
-  const pubDate = item.pubDate ? (() => {
-    try { return new Date(item.pubDate!).toISOString().split('T')[0]; } catch { return null; }
-  })() : null;
+  // Verify all URLs in parallel; use first verified as the finding's primary URL
+  const verifiedFlags = await Promise.all(items.map(i => verifyUrl(i.url)));
+  const primaryVerifiedUrl = items.find((_, idx) => verifiedFlags[idx])?.url ?? null;
 
   const { data: finding, error: findingError } = await supabase
     .from('findings')
@@ -428,7 +507,7 @@ async function processArticle(
       amount_usd: extracted.amount_usd ?? null,
       date_occurred: extracted.date_occurred ?? null,
       date_reported: new Date().toISOString().split('T')[0],
-      source_url: verifiedSourceUrl,
+      source_url: primaryVerifiedUrl,
     })
     .select('id')
     .single();
@@ -440,14 +519,19 @@ async function processArticle(
 
   const findingId = finding.id;
 
-  if (verifiedSourceUrl) {
-    const sourceTitle = content.title || item.title || null;
+  // Insert one source row per verified URL in the group
+  for (let idx = 0; idx < items.length; idx++) {
+    if (!verifiedFlags[idx]) continue;
+    const groupItem = items[idx];
+    const itemPubDate = groupItem.pubDate ? (() => {
+      try { return new Date(groupItem.pubDate!).toISOString().split('T')[0]; } catch { return null; }
+    })() : null;
     await supabase.from('sources').insert({
       finding_id: findingId,
-      url: verifiedSourceUrl,
-      title: sourceTitle,
-      outlet: item.outlet,
-      published_at: pubDate ?? extracted.date_occurred ?? null,
+      url: groupItem.url,
+      title: content.title || groupItem.title || null,
+      outlet: groupItem.outlet,
+      published_at: itemPubDate ?? extracted.date_occurred ?? null,
     });
   }
 
@@ -556,13 +640,16 @@ Deno.serve(async (req: Request) => {
     }
     console.log(`${queue.length} unique articles to process`);
 
-    // Step 3: process articles serially through Claude
-    for (const item of queue) {
-      articlesFound++;
-      console.log(`  Processing (${articlesFound}/${queue.length}): ${item.title || item.url}`);
+    // Step 3: cluster items into topic groups (one Claude call)
+    const groups = await clusterItemsIntoGroups(anthropic, queue);
 
-      const content = await resolveRssContent(item);
-      const created = await processArticle(supabase, anthropic, item, content);
+    // Step 4: process each group — fetch content in parallel, one Claude call per group
+    for (const group of groups) {
+      articlesFound += group.length;
+      console.log(`  Processing group (${group.length} article${group.length > 1 ? 's' : ''}): ${group[0].title || group[0].url}`);
+
+      const content = await resolveGroupContent(group);
+      const created = await processArticle(supabase, anthropic, group, content);
       if (created) findingsCreated++;
     }
   } catch (e) {
