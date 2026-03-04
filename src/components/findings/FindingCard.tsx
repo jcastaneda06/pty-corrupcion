@@ -36,10 +36,10 @@ export function FindingCard({ finding }: Props) {
             {formatMoney(finding.amount_usd)}
           </span>
         )}
-        {finding.date_reported && (
+        {(finding.sources?.[0]?.published_at ?? finding.date_occurred ?? finding.date_reported) && (
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {formatDate(finding.date_reported)}
+            {formatDate(finding.sources?.[0]?.published_at ?? finding.date_occurred ?? finding.date_reported ?? '')}
           </span>
         )}
         {totalPeople > 0 && (

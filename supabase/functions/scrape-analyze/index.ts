@@ -2,16 +2,15 @@
  * scrape-analyze — Supabase Edge Function (Deno)
  *
  * Triggered daily by pg_cron. Searches the internet broadly for any Panamanian
- * corruption, social abuse, or government misconduct news using Google News and
- * Bing News RSS feeds, sends results to Claude AI for structured extraction,
- * and inserts findings into the DB.
+ * corruption, social abuse, or government misconduct news using Google News RSS,
+ * sends results to Gemini AI for structured extraction, and inserts findings into the DB.
  *
  * Deploy: supabase functions deploy scrape-analyze
- * Secret:  supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+ * Secret:  supabase secrets set GEMINI_API_KEY=AIza...
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.30.0';
+import { GoogleGenerativeAI, type GenerativeModel } from 'https://esm.sh/@google/generative-ai';
 
 // ── Search queries ────────────────────────────────────────────────────────────
 // Each query is sent to both Google News and Bing News RSS, giving two independent
@@ -73,27 +72,6 @@ const SEARCH_QUERIES = [
 function googleNewsRssUrl(query: string): string {
   const encoded = encodeURIComponent(query);
   return `https://news.google.com/rss/search?q=${encoded}&hl=es-419&gl=PA&ceid=PA:es-419`;
-}
-
-function bingNewsRssUrl(query: string): string {
-  const encoded = encodeURIComponent(query);
-  return `https://www.bing.com/news/search?q=${encoded}&format=rss&mkt=es-PA`;
-}
-
-// Bing RSS items link to bing.com/news/apiclick.aspx?url=ENCODED_REAL_URL
-// When extracted from RSS XML, & is encoded as &amp;, so we must unescape first
-// before URL parsing — otherwise searchParams.get('url') returns null.
-function resolveBingUrl(url: string): string {
-  try {
-    // Unescape XML entities present when the URL comes from RSS XML content
-    const unescaped = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-    const parsed = new URL(unescaped);
-    if (parsed.hostname.includes('bing.com')) {
-      const actual = parsed.searchParams.get('url'); // already percent-decoded by URLSearchParams
-      if (actual) return actual;
-    }
-  } catch { /* ignore */ }
-  return url;
 }
 
 // ── Helper: verify a URL returns a 2xx response ───────────────────────────────
@@ -179,8 +157,7 @@ async function fetchRssItems(feedUrl: string): Promise<RssItem[]> {
         chunk.match(/<link[^>]*>([\s\S]*?)<\/link>/i)?.[1] ??
         chunk.match(/<guid[^>]*isPermaLink="true"[^>]*>([\s\S]*?)<\/guid>/i)?.[1] ??
         '';
-      let url = extractCdata(linkRaw).trim();
-      url = resolveBingUrl(url); // unwrap Bing redirect to get real article URL
+      const url = extractCdata(linkRaw).trim();
 
       const descRaw = chunk.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] ?? '';
       const description = stripHtml(extractCdata(descRaw));
@@ -356,12 +333,12 @@ async function isDuplicate(
   return !!(byTitle && byTitle.length > 0);
 }
 
-// ── Cluster RSS items into topic groups via Claude ────────────────────────────
-// One Claude call groups all items so articles about the same case produce
+// ── Cluster RSS items into topic groups via Gemini ───────────────────────────
+// One Gemini call groups all items so articles about the same case produce
 // one consolidated finding instead of many duplicates.
 
 async function clusterItemsIntoGroups(
-  anthropic: Anthropic,
+  model: GenerativeModel,
   items: RssItem[]
 ): Promise<RssItem[][]> {
   if (items.length <= 1) return items.map(item => [item]);
@@ -371,25 +348,16 @@ async function clusterItemsIntoGroups(
     .join('\n');
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
+    const text = await callGemini(model, `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
 
 ${itemList}
 
 Responde ÚNICAMENTE con JSON válido (sin markdown ni comentarios):
 {"groups":[[0,3,7],[1,2],[4],[5,6],...]}
 
-Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`,
-      }],
-    });
+Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`);
 
-    const block = message.content[0];
-    if (block.type !== 'text') throw new Error('no text block');
-    const jsonMatch = block.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON object in clustering response');
     const { groups } = JSON.parse(jsonMatch[0]) as { groups: number[][] };
 
@@ -400,7 +368,7 @@ Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`,
       valid.forEach(i => seen.add(i));
       if (valid.length > 0) result.push(valid.map(i => items[i]));
     }
-    // Append any items Claude missed
+    // Append any items Gemini missed
     for (let i = 0; i < items.length; i++) {
       if (!seen.has(i)) result.push([items[i]]);
     }
@@ -409,7 +377,7 @@ Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`,
     console.log(`Clustered ${items.length} articles into ${result.length} groups (${grouped} multi-article groups)`);
     return result;
   } catch (e) {
-    console.warn('Clustering failed, treating each item independently:', e);
+    console.warn('Gemini clustering failed, treating each item independently:', e);
     return items.map(item => [item]);
   }
 }
@@ -455,13 +423,31 @@ async function upsertPerson(
   return data.id;
 }
 
+// ── Gemini call with one retry on 429 ────────────────────────────────────────
+
+async function callGemini(model: GenerativeModel, prompt: string): Promise<string> {
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (e: unknown) {
+    const err = e as { status?: number; message?: string };
+    if (err?.status === 429 || String(err?.message).includes('429')) {
+      console.warn('Rate limited — retrying in 6s');
+      await new Promise(r => setTimeout(r, 6000));
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    }
+    throw e;
+  }
+}
+
 // ── Process a group of articles through Claude and persist to DB ───────────────
 // All items in the group are about the same case; one finding is created with
 // one source row per verified URL.
 
 async function processArticle(
   supabase: ReturnType<typeof createClient>,
-  anthropic: Anthropic,
+  model: GenerativeModel,
   items: RssItem[],
   content: ArticleContent
 ): Promise<boolean> {
@@ -469,18 +455,12 @@ async function processArticle(
 
   let extracted: Record<string, unknown>;
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: buildExtractionPrompt(content, primaryItem.url) }],
-    });
-    const block = message.content[0];
-    if (block.type !== 'text') return false;
-    // Strip markdown fences Claude sometimes adds despite instructions
-    const rawText = block.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    extracted = JSON.parse(rawText);
+    const rawText = await callGemini(model, buildExtractionPrompt(content, primaryItem.url));
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON object in Gemini response');
+    extracted = JSON.parse(jsonMatch[0]);
   } catch (e) {
-    console.error(`  Claude/parse error for ${primaryItem.url}:`, e);
+    console.error(`  Gemini/parse error for ${primaryItem.url}:`, e);
     return false;
   }
 
@@ -598,17 +578,17 @@ Deno.serve(async (req: Request) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!;
+  const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
 
-  if (!anthropicKey) {
+  if (!geminiKey) {
     return new Response(
-      JSON.stringify({ error: 'ANTHROPIC_API_KEY not set. Run: supabase secrets set ANTHROPIC_API_KEY=sk-ant-...' }),
+      JSON.stringify({ error: 'GEMINI_API_KEY not set. Run: supabase secrets set GEMINI_API_KEY=AIza...' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const anthropic = new Anthropic({ apiKey: anthropicKey });
+  const model = new GoogleGenerativeAI(geminiKey).getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const startTime = Date.now();
   let articlesFound = 0;
@@ -616,11 +596,10 @@ Deno.serve(async (req: Request) => {
   let lastError: string | null = null;
 
   try {
-    // Step 1: fetch ALL RSS feeds in parallel (~72 requests at once, ~10s total)
-    const allFeeds = SEARCH_QUERIES.flatMap(q => [
-      { feedUrl: googleNewsRssUrl(q), label: `google:${q}` },
-      { feedUrl: bingNewsRssUrl(q),   label: `bing:${q}` },
-    ]);
+    // Step 1: fetch all Google News RSS feeds in parallel (~36 requests at once, ~10s total)
+    const allFeeds = SEARCH_QUERIES.map(q => ({
+      feedUrl: googleNewsRssUrl(q), label: `google:${q}`,
+    }));
 
     console.log(`Fetching ${allFeeds.length} RSS feeds in parallel…`);
     const feedResults = await Promise.all(
@@ -641,16 +620,25 @@ Deno.serve(async (req: Request) => {
     console.log(`${queue.length} unique articles to process`);
 
     // Step 3: cluster items into topic groups (one Claude call)
-    const groups = await clusterItemsIntoGroups(anthropic, queue);
+    const groups = await clusterItemsIntoGroups(model, queue);
 
-    // Step 4: process each group — fetch content in parallel, one Claude call per group
-    for (const group of groups) {
-      articlesFound += group.length;
-      console.log(`  Processing group (${group.length} article${group.length > 1 ? 's' : ''}): ${group[0].title || group[0].url}`);
+    // Step 4: process groups in parallel batches, respecting a time budget
+    const BATCH_SIZE = 6;
+    const TIME_BUDGET_MS = 80_000;
 
-      const content = await resolveGroupContent(group);
-      const created = await processArticle(supabase, anthropic, group, content);
-      if (created) findingsCreated++;
+    for (let i = 0; i < groups.length; i += BATCH_SIZE) {
+      if (Date.now() - startTime > TIME_BUDGET_MS) {
+        console.log(`Time budget reached after ${i} of ${groups.length} groups — stopping early`);
+        break;
+      }
+      const batch = groups.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(batch.map(async (group) => {
+        articlesFound += group.length;
+        console.log(`  Processing group (${group.length} article${group.length > 1 ? 's' : ''}): ${group[0].title || group[0].url}`);
+        const content = await resolveGroupContent(group);
+        return processArticle(supabase, model, group, content);
+      }));
+      findingsCreated += results.filter(Boolean).length;
     }
   } catch (e) {
     lastError = e instanceof Error ? e.message : String(e);

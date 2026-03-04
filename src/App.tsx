@@ -6,6 +6,7 @@ import { Findings } from './pages/Findings';
 import { FindingDetail } from './pages/FindingDetail';
 import { PersonDetail } from './pages/PersonDetail';
 import { NotFound } from './pages/NotFound';
+import { CorruptionIndex } from './pages/CorruptionIndex';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ export function App() {
             <Route path="/hallazgos" element={<Findings />} />
             <Route path="/hallazgos/:id" element={<FindingDetail />} />
             <Route path="/personas/:id" element={<PersonDetail />} />
+            <Route path="/indice" element={<CorruptionIndex />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>

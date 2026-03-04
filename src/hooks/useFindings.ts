@@ -39,7 +39,7 @@ async function fetchFindings(filters: FindingFilters = {}): Promise<Finding[]> {
 async function fetchDashboardStats(): Promise<DashboardStats> {
   const { data: findings, error } = await supabase
     .from('findings')
-    .select('*')
+    .select('*, sources(*)')
     .order('date_reported', { ascending: false });
 
   if (error) throw error;

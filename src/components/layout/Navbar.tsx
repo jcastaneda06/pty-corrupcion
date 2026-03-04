@@ -1,10 +1,11 @@
 import { Link, NavLink } from 'react-router-dom';
-import { Scale, LayoutDashboard, FileText, Menu, X } from 'lucide-react';
+import { Scale, LayoutDashboard, FileText, TrendingDown, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const navLinks = [
   { to: '/', label: 'Panel', icon: LayoutDashboard, exact: true },
   { to: '/hallazgos', label: 'Hallazgos', icon: FileText, exact: false },
+  { to: '/indice', label: 'Índice', icon: TrendingDown, exact: false },
 ];
 
 export function Navbar() {
