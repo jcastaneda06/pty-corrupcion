@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Calendar, DollarSign, ChevronRight, Users } from 'lucide-react';
+import { Calendar, ChevronRight, Users } from 'lucide-react';
 import { type Finding } from '../../types';
 import { SeverityBadge } from '../ui/SeverityBadge';
 import { formatDate, formatMoney, truncate, SEVERITY_COLORS } from '../../lib/utils';
@@ -33,7 +33,6 @@ export function FindingCard({ finding }: Props) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-500">
         {finding.amount_usd && (
           <span className="flex items-center gap-1 text-emerald-400 font-mono font-semibold">
-            <DollarSign className="w-3 h-3" />
             {formatMoney(finding.amount_usd)}
           </span>
         )}

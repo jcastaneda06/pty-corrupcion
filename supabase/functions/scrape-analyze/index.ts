@@ -19,6 +19,18 @@ import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.30.0';
 // a run are filtered by the in-memory processedUrls Set.
 
 const SEARCH_QUERIES = [
+  // Social / human rights (prioritized — processed first before timeout)
+  'SENNIAF panama',
+  'abuso menores hogares panama',
+  'negligencia hospital panama',
+  'CSS panama corrupcion',
+  'MINSA panama irregularidades',
+  'presos hacinamiento panama carcel',
+  'abuso policial panama',
+  'migrantes derechos humanos panama',
+  'adultos mayores abandono panama',
+  'hogar ninos panama muerte',
+
   // Financial corruption
   'corrupcion panama',
   'peculado panama',
@@ -32,18 +44,6 @@ const SEARCH_QUERIES = [
   'trafico influencias panama',
   'enriquecimiento ilicito panama',
   'desfalco panama',
-
-  // Institutions & social
-  'SENNIAF panama',
-  'abuso menores hogares panama',
-  'negligencia hospital panama',
-  'CSS panama corrupcion',
-  'MINSA panama irregularidades',
-  'presos hacinamiento panama carcel',
-  'abuso policial panama',
-  'migrantes derechos humanos panama',
-  'adultos mayores abandono panama',
-  'hogar ninos panama muerte',
 
   // Government & political
   'funcionario imputado panama',
@@ -68,7 +68,7 @@ const SEARCH_QUERIES = [
   'Panama social services abuse',
 ];
 
-// ── RSS feed URL builders ─────────────────────────────────────────────────────
+// ── RSS feed URL builders + Bing redirect resolver ────────────────────────────
 
 function googleNewsRssUrl(query: string): string {
   const encoded = encodeURIComponent(query);
@@ -78,6 +78,19 @@ function googleNewsRssUrl(query: string): string {
 function bingNewsRssUrl(query: string): string {
   const encoded = encodeURIComponent(query);
   return `https://www.bing.com/news/search?q=${encoded}&format=rss&mkt=es-PA`;
+}
+
+// Bing RSS items link to bing.com/news/apiclick.aspx?url=ENCODED_REAL_URL
+// This extracts and returns the actual article URL.
+function resolveBingUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('bing.com')) {
+      const actual = parsed.searchParams.get('url');
+      if (actual) return decodeURIComponent(actual);
+    }
+  } catch { /* ignore */ }
+  return url;
 }
 
 // ── Helper: verify a URL returns a 2xx response ───────────────────────────────
@@ -163,7 +176,8 @@ async function fetchRssItems(feedUrl: string): Promise<RssItem[]> {
         chunk.match(/<link[^>]*>([\s\S]*?)<\/link>/i)?.[1] ??
         chunk.match(/<guid[^>]*isPermaLink="true"[^>]*>([\s\S]*?)<\/guid>/i)?.[1] ??
         '';
-      const url = extractCdata(linkRaw).trim();
+      let url = extractCdata(linkRaw).trim();
+      url = resolveBingUrl(url); // unwrap Bing redirect to get real article URL
 
       const descRaw = chunk.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] ?? '';
       const description = stripHtml(extractCdata(descRaw));
@@ -178,7 +192,7 @@ async function fetchRssItems(feedUrl: string): Promise<RssItem[]> {
       items.push({ url, title, description, outlet, pubDate });
     }
 
-    return items.slice(0, 15);
+    return items.slice(0, 8);
   } catch {
     return [];
   }
@@ -427,9 +441,11 @@ async function processArticle(
   const findingId = finding.id;
 
   if (verifiedSourceUrl) {
+    const sourceTitle = content.title || item.title || null;
     await supabase.from('sources').insert({
       finding_id: findingId,
       url: verifiedSourceUrl,
+      title: sourceTitle,
       outlet: item.outlet,
       published_at: pubDate ?? extracted.date_occurred ?? null,
     });
@@ -511,39 +527,43 @@ Deno.serve(async (req: Request) => {
   const anthropic = new Anthropic({ apiKey: anthropicKey });
 
   const startTime = Date.now();
-  let queriesChecked = 0;
   let articlesFound = 0;
   let findingsCreated = 0;
   let lastError: string | null = null;
 
-  // In-memory dedup: skip URLs already processed in this run
-  const processedUrls = new Set<string>();
-
   try {
-    for (const query of SEARCH_QUERIES) {
-      queriesChecked++;
-      console.log(`Query: "${query}"`);
+    // Step 1: fetch ALL RSS feeds in parallel (~72 requests at once, ~10s total)
+    const allFeeds = SEARCH_QUERIES.flatMap(q => [
+      { feedUrl: googleNewsRssUrl(q), label: `google:${q}` },
+      { feedUrl: bingNewsRssUrl(q),   label: `bing:${q}` },
+    ]);
 
-      // Fetch from both Google News and Bing News
-      const [googleItems, bingItems] = await Promise.all([
-        fetchRssItems(googleNewsRssUrl(query)),
-        fetchRssItems(bingNewsRssUrl(query)),
-      ]);
+    console.log(`Fetching ${allFeeds.length} RSS feeds in parallel…`);
+    const feedResults = await Promise.all(
+      allFeeds.map(f => fetchRssItems(f.feedUrl))
+    );
+    console.log(`RSS fetch complete. Deduplicating…`);
 
-      const allItems = [...googleItems, ...bingItems];
-      console.log(`  ${googleItems.length} Google + ${bingItems.length} Bing = ${allItems.length} items`);
-
-      for (const item of allItems) {
+    // Step 2: flatten + deduplicate by URL
+    const processedUrls = new Set<string>();
+    const queue: RssItem[] = [];
+    for (const items of feedResults) {
+      for (const item of items) {
         if (!item.url || processedUrls.has(item.url)) continue;
         processedUrls.add(item.url);
-
-        articlesFound++;
-        console.log(`  Processing: ${item.title || item.url}`);
-
-        const content = await resolveRssContent(item);
-        const created = await processArticle(supabase, anthropic, item, content);
-        if (created) findingsCreated++;
+        queue.push(item);
       }
+    }
+    console.log(`${queue.length} unique articles to process`);
+
+    // Step 3: process articles serially through Claude
+    for (const item of queue) {
+      articlesFound++;
+      console.log(`  Processing (${articlesFound}/${queue.length}): ${item.title || item.url}`);
+
+      const content = await resolveRssContent(item);
+      const created = await processArticle(supabase, anthropic, item, content);
+      if (created) findingsCreated++;
     }
   } catch (e) {
     lastError = e instanceof Error ? e.message : String(e);
@@ -553,7 +573,7 @@ Deno.serve(async (req: Request) => {
   const duration = Date.now() - startTime;
 
   await supabase.from('scrape_log').insert({
-    sources_checked: queriesChecked,
+    sources_checked: SEARCH_QUERIES.length,
     articles_found: articlesFound,
     findings_created: findingsCreated,
     status: lastError ? 'error' : findingsCreated > 0 ? 'success' : 'partial',
@@ -564,7 +584,7 @@ Deno.serve(async (req: Request) => {
   return new Response(
     JSON.stringify({
       success: !lastError,
-      queries_checked: queriesChecked,
+      queries_checked: SEARCH_QUERIES.length,
       articles_found: articlesFound,
       findings_created: findingsCreated,
       duration_ms: duration,

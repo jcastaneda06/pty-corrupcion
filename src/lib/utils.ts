@@ -48,7 +48,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
 export function formatMoney(amount: number | null | undefined): string {
   if (amount == null) return 'Monto desconocido';
   if (amount >= 1_000_000_000) {
-    return `$${(amount / 1_000_000_000).toFixed(1)}B`;
+    return `$${(amount / 1_000_000_000).toFixed(1)} mil millones`;
   }
   if (amount >= 1_000_000) {
     return `$${(amount / 1_000_000).toFixed(1)}M`;

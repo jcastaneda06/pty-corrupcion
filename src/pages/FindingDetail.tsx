@@ -190,14 +190,14 @@ export function FindingDetail() {
           </h2>
           <ul className="space-y-2.5">
             {sources.map((source) => (
-              <li key={source.id} className="flex items-start gap-2">
+              <li key={source.id} className="flex items-start gap-2 min-w-0">
                 <ExternalLink className="w-3.5 h-3.5 text-gray-600 flex-shrink-0 mt-0.5" />
-                <div>
+                <div className="min-w-0 flex-1 overflow-hidden">
                   <a
                     href={source.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors hover:underline"
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors hover:underline break-all"
                   >
                     {source.title ?? source.url}
                   </a>
