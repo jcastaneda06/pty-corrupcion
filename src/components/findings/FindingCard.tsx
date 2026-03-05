@@ -74,24 +74,24 @@ export function FindingCard({ finding }: Props) {
   return (
     <Link
       to={`/hallazgos/${finding.id}`}
-      className="group block"
+      className="group block h-full"
     >
       <Card
-        className="bg-dark-800 border-dark-600 hover:border-dark-500 transition-all hover:shadow-lg hover:shadow-black/30 p-5"
+        className="bg-dark-800 border-dark-600 hover:border-dark-500 transition-all hover:shadow-lg hover:shadow-black/30 p-5 flex flex-col h-full"
         style={{ borderLeftColor: SEVERITY_COLORS[finding.severity], borderLeftWidth: 3 }}
       >
         <div className="flex items-start justify-between gap-3 mb-3">
-          <h3 className="font-semibold text-white text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">
+          <h3 className="font-semibold text-white text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2 min-h-[2.5rem]">
             {finding.title}
           </h3>
           <SeverityBadge severity={finding.severity} size="sm" />
         </div>
 
-        <p className="text-gray-400 text-xs leading-relaxed mb-4">
-          {truncate(finding.summary, 160)}
+        <p className="text-gray-400 text-xs leading-relaxed mb-4 line-clamp-3 min-h-[3.75rem]">
+          {finding.summary}
         </p>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-500 mt-auto">
           {finding.amount_usd && (
             <span className="flex items-center gap-1 text-emerald-400 font-mono font-semibold">
               {formatMoney(finding.amount_usd)}
@@ -123,7 +123,7 @@ export function FindingCard({ finding }: Props) {
 
         {/* Reactions — Discord style */}
         <div
-          className="mt-2.5 flex flex-wrap items-center gap-1.5"
+          className="mt-2.5 flex flex-wrap items-center gap-1.5 min-h-[1.75rem]"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
           {grouped.map(([emoji, count]) => {

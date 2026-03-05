@@ -1,7 +1,13 @@
-import { Search, X } from 'lucide-react';
+import { useState } from 'react';
+import { Search, X, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
 import { type FindingFilters, type Severity } from '../../types';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -9,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const SEVERITIES: { value: Severity; label: string }[] = [
   { value: 'critico', label: 'Crítico' },
@@ -35,7 +42,20 @@ interface Props {
   onChange: (f: FindingFilters) => void;
 }
 
+// Convert YYYY-MM-DD string to Date (local noon to avoid timezone shifts)
+function toDate(str: string): Date {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
+}
+
+// Convert Date to YYYY-MM-DD string
+function toStr(d: Date): string {
+  return format(d, 'yyyy-MM-dd');
+}
+
 export function FindingFilters({ filters, onChange }: Props) {
+  const [open, setOpen] = useState(false);
+
   const hasActiveFilters =
     filters.severity || filters.category || filters.search || filters.dateFrom || filters.dateTo;
 
@@ -44,6 +64,30 @@ export function FindingFilters({ filters, onChange }: Props) {
 
   const clear = () =>
     onChange({ severity: '', category: '', search: '', dateFrom: '', dateTo: '' });
+
+  // Build DateRange from filter strings
+  const dateRange: DateRange | undefined =
+    filters.dateFrom || filters.dateTo
+      ? {
+          from: filters.dateFrom ? toDate(filters.dateFrom) : undefined,
+          to: filters.dateTo ? toDate(filters.dateTo) : undefined,
+        }
+      : undefined;
+
+  const handleDateRange = (range: DateRange | undefined) => {
+    update({
+      dateFrom: range?.from ? toStr(range.from) : '',
+      dateTo: range?.to ? toStr(range.to) : '',
+    });
+    // Close only when both ends are picked
+    if (range?.from && range?.to) setOpen(false);
+  };
+
+  const dateLabel = dateRange?.from
+    ? dateRange.to
+      ? `${format(dateRange.from, 'd MMM', { locale: es })} – ${format(dateRange.to, 'd MMM yyyy', { locale: es })}`
+      : format(dateRange.from, 'd MMM yyyy', { locale: es })
+    : 'Rango de fechas';
 
   return (
     <div className="bg-dark-800 border border-dark-600 rounded-xl p-4 space-y-4">
@@ -106,30 +150,48 @@ export function FindingFilters({ filters, onChange }: Props) {
           </Select>
         </div>
 
-        {/* Date From */}
-        <div>
+        {/* Date range picker — spans 2 cols on large screens */}
+        <div className="lg:col-span-2">
           <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
-            Desde
+            Período
           </label>
-          <Input
-            type="date"
-            value={filters.dateFrom ?? ''}
-            onChange={(e) => update({ dateFrom: e.target.value })}
-            className="bg-dark-700 border-dark-500 text-white focus-visible:ring-blue-500 h-9 [color-scheme:dark]"
-          />
-        </div>
-
-        {/* Date To */}
-        <div>
-          <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
-            Hasta
-          </label>
-          <Input
-            type="date"
-            value={filters.dateTo ?? ''}
-            onChange={(e) => update({ dateTo: e.target.value })}
-            className="bg-dark-700 border-dark-500 text-white focus-visible:ring-blue-500 h-9 [color-scheme:dark]"
-          />
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full h-9 justify-start text-left font-normal bg-dark-700 border-dark-500 hover:bg-dark-600 hover:text-white",
+                  dateRange ? "text-white" : "text-gray-500"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">{dateLabel}</span>
+                {dateRange && (
+                  <X
+                    className="ml-auto h-3.5 w-3.5 shrink-0 text-gray-400 hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      update({ dateFrom: '', dateTo: '' });
+                    }}
+                  />
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto p-0 bg-dark-800 border-dark-600"
+              align="start"
+            >
+              <Calendar
+                initialFocus
+                mode="range"
+                selected={dateRange}
+                onSelect={handleDateRange}
+                numberOfMonths={2}
+                locale={es}
+                className="text-white"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
