@@ -1,14 +1,12 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, DollarSign, AlertTriangle, FileSearch, ArrowRight } from 'lucide-react';
+import { ArrowRight, BarChart2 } from 'lucide-react';
 import { useDashboardStats } from '../hooks/useFindings';
 import { FindingCard } from '../components/findings/FindingCard';
 import { FindingFilters } from '../components/findings/FindingFilters';
 import { FindingCardSkeleton } from '../components/ui/Skeleton';
-import { formatMoney, SEVERITY_LABELS, SEVERITY_COLORS } from '../lib/utils';
-import { type Severity, type FindingFilters as Filters } from '../types';
-
-const SEVERITIES: Severity[] = ['critico', 'alto', 'medio', 'bajo'];
+import { formatMoney } from '../lib/utils';
+import { type FindingFilters as Filters } from '../types';
 
 export function Dashboard() {
   const { data: stats, isLoading, error } = useDashboardStats();
@@ -54,73 +52,22 @@ export function Dashboard() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={<FileSearch className="w-5 h-5 text-blue-400" />}
-          label="Total Hallazgos"
-          value={isLoading ? '…' : String(stats?.total_findings ?? 0)}
-          sub="casos registrados"
-          color="blue"
-        />
-        <StatCard
-          icon={<DollarSign className="w-5 h-5 text-emerald-400" />}
-          label="Fondos Comprometidos"
-          value={isLoading ? '…' : formatMoney(stats?.total_amount_usd ?? 0)}
-          sub="monto total estimado"
-          color="emerald"
-        />
-        <StatCard
-          icon={<AlertTriangle className="w-5 h-5 text-red-400" />}
-          label="Casos Críticos"
-          value={isLoading ? '…' : String(stats?.by_severity.critico ?? 0)}
-          sub="severidad máxima"
-          color="red"
-        />
-        <StatCard
-          icon={<TrendingUp className="w-5 h-5 text-orange-400" />}
-          label="En Investigación"
-          value={isLoading ? '…' : String(stats?.by_severity.medio ?? 0)}
-          sub="seguimiento activo"
-          color="orange"
-        />
-      </section>
-
-      {/* Severity breakdown */}
-      <section>
-        <h2 className="text-lg font-semibold text-white mb-4">Por Severidad</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {SEVERITIES.map((sev) => {
-            const count = stats?.by_severity[sev] ?? 0;
-            const total = stats?.total_findings ?? 1;
-            const pct = Math.round((count / total) * 100);
-            return (
-              <Link
-                key={sev}
-                to={`/hallazgos?severity=${sev}`}
-                className="bg-dark-800 border border-dark-600 hover:border-dark-500 rounded-xl p-4 transition-all group"
-              >
-                <div
-                  className="text-2xl font-bold mb-1"
-                  style={{ color: SEVERITY_COLORS[sev] }}
-                >
-                  {isLoading ? '–' : count}
-                </div>
-                <div className="text-sm text-gray-400 font-medium">{SEVERITY_LABELS[sev]}</div>
-                <div className="mt-2 h-1.5 bg-dark-600 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: isLoading ? '0%' : `${pct}%`,
-                      backgroundColor: SEVERITY_COLORS[sev],
-                    }}
-                  />
-                </div>
-                <div className="text-xs text-gray-600 mt-1">{pct}% del total</div>
-              </Link>
-            );
-          })}
-        </div>
+      {/* Compact stats strip */}
+      <section className="bg-dark-800 border border-dark-700 rounded-xl px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <Stat label="Hallazgos" value={isLoading ? '…' : String(stats?.total_findings ?? 0)} color="text-white" />
+        <div className="hidden sm:block w-px h-7 bg-dark-600" />
+        <Stat label="Comprometido" value={isLoading ? '…' : formatMoney(stats?.total_amount_usd ?? 0)} color="text-emerald-400" />
+        <div className="hidden sm:block w-px h-7 bg-dark-600" />
+        <Stat label="Críticos" value={isLoading ? '…' : String(stats?.by_severity.critico ?? 0)} color="text-red-400" />
+        <div className="hidden sm:block w-px h-7 bg-dark-600" />
+        <Stat label="En investigación" value={isLoading ? '…' : String(stats?.by_severity.medio ?? 0)} color="text-yellow-400" />
+        <Link
+          to="/estadisticas"
+          className="ml-auto flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          <BarChart2 className="w-4 h-4" />
+          Ver estadísticas
+        </Link>
       </section>
 
       {/* Findings with filters */}
@@ -187,34 +134,11 @@ export function Dashboard() {
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub: string;
-  color: 'blue' | 'emerald' | 'red' | 'orange';
-}) {
-  const borderColor = {
-    blue: 'border-blue-500/20 hover:border-blue-500/40',
-    emerald: 'border-emerald-500/20 hover:border-emerald-500/40',
-    red: 'border-red-500/20 hover:border-red-500/40',
-    orange: 'border-orange-500/20 hover:border-orange-500/40',
-  }[color];
-
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className={`bg-dark-800 border ${borderColor} rounded-xl p-4 transition-colors`}>
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="text-xl sm:text-2xl font-bold text-white font-mono">{value}</div>
-      <div className="text-xs text-gray-600 mt-0.5">{sub}</div>
+    <div>
+      <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className={`text-xl font-bold font-mono ${color}`}>{value}</p>
     </div>
   );
 }

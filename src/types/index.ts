@@ -2,6 +2,24 @@ export type Severity = 'critico' | 'alto' | 'medio' | 'bajo';
 
 export type RelationshipType = 'familiar' | 'socio_comercial' | 'politico' | 'empleado' | 'otro';
 
+export interface FindingComment {
+  id: string;
+  finding_id: string;
+  user_id: string;
+  author_name: string;
+  author_email: string;
+  content: string;
+  created_at: string;
+}
+
+export interface Reaction {
+  id: string;
+  finding_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
+
 export interface Finding {
   id: string;
   title: string;
@@ -18,6 +36,8 @@ export interface Finding {
   // joined fields
   people?: FindingPerson[];
   sources?: Source[];
+  reactions?: Reaction[];
+  finding_comments?: FindingComment[];
 }
 
 export interface Person {

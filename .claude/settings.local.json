@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "WebSearch",
+      "WebFetch(domain:supabase.com)",
+      "Bash(node:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}

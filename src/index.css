@@ -51,6 +51,25 @@
     background-color: #1a1a2e;
     color: white;
   }
+
+  /* emoji-picker-react dark theme overrides — library sets these as inline
+     styles, so !important is required to override them */
+  .EmojiPickerReact {
+    --epr-dark-bg-color: #1a1a2e !important;
+    --epr-dark-category-label-bg-color: #1a1a2ee6 !important;
+    --epr-dark-search-input-bg-color: #16213e !important;
+    --epr-dark-search-input-bg-color-active: #1e2a4a !important;
+    --epr-dark-hover-bg-color: #16213e !important;
+    --epr-dark-hover-bg-color-reduced-opacity: #16213e80 !important;
+    --epr-dark-focus-bg-color: #243358 !important;
+    --epr-dark-picker-border-color: #1e2a4a !important;
+    --epr-dark-category-icon-active-color: #3b82f6 !important;
+    --epr-dark-highlight-color: #94a3b8 !important;
+    --epr-dark-text-color: #94a3b8 !important;
+    border-radius: 12px !important;
+    border-color: #1e2a4a !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+  }
 }
 
 @layer utilities {

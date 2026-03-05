@@ -11,7 +11,8 @@ async function fetchFindings(filters: FindingFilters = {}): Promise<Finding[]> {
         *,
         person:people(*)
       ),
-      sources(*)
+      sources(*),
+      reactions(*)
     `)
     .order('date_reported', { ascending: false });
 
@@ -39,7 +40,7 @@ async function fetchFindings(filters: FindingFilters = {}): Promise<Finding[]> {
 async function fetchDashboardStats(): Promise<DashboardStats> {
   const { data: findings, error } = await supabase
     .from('findings')
-    .select('*, sources(*), people:finding_people(*, person:people(*))')
+    .select('*, sources(*), people:finding_people(*, person:people(*)), reactions(*)')
     .order('created_at', { ascending: false });
 
   if (error) throw error;

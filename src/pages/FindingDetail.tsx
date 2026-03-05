@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -8,19 +9,45 @@ import {
   DollarSign,
   Newspaper,
   GitBranch,
+  MessageSquare,
+  Send,
+  Plus,
+  LogIn,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useFinding, useFindingRelationships } from '../hooks/useFinding';
+import { useAddFindingComment, useAddReaction, useRemoveReaction } from '../hooks/useFindingComments';
 import { RelationshipMap } from '../components/findings/RelationshipMap';
 import { SeverityBadge } from '../components/ui/SeverityBadge';
+import { EmojiPickerPortal } from '../components/ui/EmojiPickerPortal';
 import { MoneyAmount } from '../components/ui/MoneyAmount';
 import { PersonChip } from '../components/ui/PersonChip';
 import { Skeleton } from '../components/ui/Skeleton';
-import { formatDate, SEVERITY_COLORS } from '../lib/utils';
+import { formatDate, getInitials, SEVERITY_COLORS } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
+import { type Reaction } from '../types';
+
+function groupReactions(reactions: Reaction[]): [string, number][] {
+  const map: Record<string, number> = {};
+  for (const r of reactions) {
+    map[r.emoji] = (map[r.emoji] ?? 0) + 1;
+  }
+  return Object.entries(map).sort((a, b) => b[1] - a[1]);
+}
 
 export function FindingDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user, openAuthModal } = useAuth();
   const { data: finding, isLoading, error } = useFinding(id!);
   const { data: relationships = [] } = useFindingRelationships(id!);
+  const addReaction = useAddReaction();
+  const removeReaction = useRemoveReaction();
+  const addComment = useAddFindingComment(id!);
+
+  const [showPicker, setShowPicker] = useState(false);
+  const pickerBtnRef = useRef<HTMLButtonElement>(null);
+  const [content, setContent] = useState('');
 
   if (isLoading) {
     return (
@@ -49,7 +76,45 @@ export function FindingDetail() {
 
   const people = finding.people ?? [];
   const sources = finding.sources ?? [];
+  const reactions = finding.reactions ?? [];
+  const comments = finding.finding_comments ?? [];
+  const grouped = groupReactions(reactions);
   const severityColor = SEVERITY_COLORS[finding.severity];
+
+  const myReactionEmojis = new Set(
+    reactions.filter((r) => r.user_id === user?.id).map((r) => r.emoji)
+  );
+
+  const displayName =
+    user?.user_metadata?.full_name ??
+    user?.user_metadata?.name ??
+    user?.email?.split('@')[0] ??
+    'Usuario';
+
+  const handleReaction = (emoji: string) => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    if (myReactionEmojis.has(emoji)) {
+      removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+    } else {
+      addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+    }
+    setShowPicker(false);
+  };
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !content.trim()) return;
+    await addComment.mutateAsync({
+      user_id: user.id,
+      author_name: displayName,
+      author_email: user.email ?? '',
+      content: content.trim(),
+    });
+    setContent('');
+  };
 
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -212,6 +277,145 @@ export function FindingDetail() {
           </ul>
         </section>
       )}
+
+      {/* Reactions */}
+      <section className="bg-dark-800 border border-dark-600 rounded-xl p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          {grouped.map(([emoji, count]) => {
+            const mine = myReactionEmojis.has(emoji);
+            return (
+              <button
+                key={emoji}
+                onClick={() => handleReaction(emoji)}
+                title={mine ? 'Quitar reacción' : undefined}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors ${
+                  mine
+                    ? 'bg-blue-500/20 border-blue-500/40 text-blue-200 hover:bg-blue-500/30'
+                    : 'bg-dark-700 border-dark-600 hover:bg-dark-600 hover:border-blue-500/50 text-gray-300'
+                }`}
+              >
+                <span>{emoji}</span>
+                <span className={`font-mono text-xs ${mine ? 'text-blue-300' : 'text-gray-400'}`}>{count}</span>
+              </button>
+            );
+          })}
+
+          <button
+            ref={pickerBtnRef}
+            onClick={() => {
+              if (!user) { openAuthModal(); return; }
+              setShowPicker((v) => !v);
+            }}
+            className="flex items-center gap-1 px-3 py-1 bg-dark-700 hover:bg-dark-600 border border-dark-600 hover:border-blue-500/50 rounded-full text-sm text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="text-xs">Reaccionar</span>
+          </button>
+        </div>
+
+        {showPicker && (
+          <EmojiPickerPortal
+            anchor={pickerBtnRef.current}
+            onSelect={handleReaction}
+            onClose={() => setShowPicker(false)}
+          />
+        )}
+      </section>
+
+      {/* Comments */}
+      <section>
+        <h2 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-blue-400" />
+          Comentarios
+          {comments.length > 0 && (
+            <span className="text-sm font-normal text-gray-500">({comments.length})</span>
+          )}
+        </h2>
+        <p className="text-xs text-gray-500 mb-5">
+          Comparte información, correcciones o contexto sobre este caso.
+        </p>
+
+        {/* Comment form or login banner */}
+        {user ? (
+          <form
+            onSubmit={handleCommentSubmit}
+            className="bg-dark-800 border border-dark-700 rounded-xl p-5 space-y-3 mb-6"
+          >
+            <p className="text-xs text-gray-500">
+              Comentando como{' '}
+              <span className="font-semibold text-gray-300">{displayName}</span>
+              {user.email && (
+                <span className="text-gray-600"> · {user.email}</span>
+              )}
+            </p>
+            <textarea
+              placeholder="Escribe un comentario…"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              required
+              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-600">{content.length}/2000</span>
+              <button
+                type="submit"
+                disabled={addComment.isPending || !content.trim()}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-white transition-colors"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {addComment.isPending ? 'Enviando…' : 'Publicar'}
+              </button>
+            </div>
+            {addComment.isError && (
+              <p className="text-xs text-red-400">Error al publicar. Intenta de nuevo.</p>
+            )}
+          </form>
+        ) : (
+          <div className="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-6 flex items-center justify-between gap-4">
+            <p className="text-sm text-gray-400">Inicia sesión para comentar.</p>
+            <button
+              onClick={openAuthModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors shrink-0"
+            >
+              <LogIn className="w-4 h-4" />
+              Iniciar sesión
+            </button>
+          </div>
+        )}
+
+        {/* Comment list — newest first */}
+        {comments.length > 0 ? (
+          <div className="space-y-3">
+            {[...comments]
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .map((c) => (
+                <div key={c.id} className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0 text-xs font-bold text-blue-300">
+                    {getInitials(c.author_name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-sm font-semibold text-white">{c.author_name}</span>
+                      <span className="text-xs text-gray-600">
+                        {formatDistanceToNow(new Date(c.created_at), { addSuffix: true, locale: es })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap break-words">
+                      {c.content}
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 text-gray-600">
+            <MessageSquare className="w-7 h-7 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">Sé el primero en comentar.</p>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

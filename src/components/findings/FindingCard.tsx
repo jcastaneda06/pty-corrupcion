@@ -1,17 +1,78 @@
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, ChevronRight, Users } from 'lucide-react';
-import { type Finding } from '../../types';
+import { Calendar, ChevronRight, Plus, Users } from 'lucide-react';
+import { type Finding, type Reaction } from '../../types';
 import { SeverityBadge } from '../ui/SeverityBadge';
+import { EmojiPickerPortal } from '../ui/EmojiPickerPortal';
 import { formatDate, formatMoney, truncate, SEVERITY_COLORS } from '../../lib/utils';
+import { useAddReaction, useRemoveReaction } from '../../hooks/useFindingComments';
+import { useAuth } from '../../contexts/AuthContext';
+
+function groupReactions(reactions: Reaction[]): [string, number][] {
+  const map: Record<string, number> = {};
+  for (const r of reactions) {
+    map[r.emoji] = (map[r.emoji] ?? 0) + 1;
+  }
+  return Object.entries(map).sort((a, b) => b[1] - a[1]);
+}
 
 interface Props {
   finding: Finding;
 }
 
 export function FindingCard({ finding }: Props) {
+  const { user, openAuthModal } = useAuth();
   const people = finding.people ?? [];
   const totalPeople = people.length;
   const convicted = people.filter((fp) => fp.is_convicted).length;
+  const grouped = groupReactions(finding.reactions ?? []);
+
+  const myReactionEmojis = new Set(
+    (finding.reactions ?? []).filter((r) => r.user_id === user?.id).map((r) => r.emoji)
+  );
+
+  const [showPicker, setShowPicker] = useState(false);
+  const pickerBtnRef = useRef<HTMLButtonElement>(null);
+  const addReaction = useAddReaction();
+  const removeReaction = useRemoveReaction();
+
+  const handleReaction = (e: React.MouseEvent, emoji: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    if (myReactionEmojis.has(emoji)) {
+      removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+    } else {
+      addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+    }
+  };
+
+  const handlePickerSelect = (emoji: string) => {
+    if (!user) {
+      openAuthModal();
+      setShowPicker(false);
+      return;
+    }
+    if (myReactionEmojis.has(emoji)) {
+      removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+    } else {
+      addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+    }
+    setShowPicker(false);
+  };
+
+  const togglePicker = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    setShowPicker((v) => !v);
+  };
 
   return (
     <Link
@@ -59,6 +120,48 @@ export function FindingCard({ finding }: Props) {
         </span>
         <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-blue-400 transition-colors" />
       </div>
+
+      {/* Reactions — Discord style */}
+      <div
+        className="mt-2.5 flex flex-wrap items-center gap-1.5"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      >
+        {grouped.map(([emoji, count]) => {
+          const mine = myReactionEmojis.has(emoji);
+          return (
+            <button
+              key={emoji}
+              onClick={(e) => handleReaction(e, emoji)}
+              title={mine ? 'Quitar reacción' : undefined}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${
+                mine
+                  ? 'bg-blue-500/20 border-blue-500/40 text-blue-200 hover:bg-blue-500/30'
+                  : 'bg-dark-700 border-dark-600 hover:bg-dark-600 hover:border-blue-500/50 text-gray-300'
+              }`}
+            >
+              <span>{emoji}</span>
+              <span className={`font-mono ${mine ? 'text-blue-300' : 'text-gray-400'}`}>{count}</span>
+            </button>
+          );
+        })}
+
+        <button
+          ref={pickerBtnRef}
+          onClick={togglePicker}
+          title="Añadir reacción"
+          className="flex items-center gap-0.5 px-2 py-0.5 bg-dark-700 hover:bg-dark-600 border border-dark-600 hover:border-blue-500/50 rounded-full text-xs text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+
+      {showPicker && (
+        <EmojiPickerPortal
+          anchor={pickerBtnRef.current}
+          onSelect={handlePickerSelect}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     </Link>
   );
 }

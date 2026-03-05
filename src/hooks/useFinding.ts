@@ -11,7 +11,9 @@ async function fetchFinding(id: string): Promise<Finding> {
         *,
         person:people(*)
       ),
-      sources(*)
+      sources(*),
+      reactions(*),
+      finding_comments(*)
     `)
     .eq('id', id)
     .single();
