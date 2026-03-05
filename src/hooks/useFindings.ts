@@ -40,7 +40,7 @@ async function fetchDashboardStats(): Promise<DashboardStats> {
   const { data: findings, error } = await supabase
     .from('findings')
     .select('*, sources(*)')
-    .order('date_reported', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) throw error;
 

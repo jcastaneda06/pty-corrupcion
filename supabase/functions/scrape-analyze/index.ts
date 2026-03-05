@@ -80,13 +80,13 @@ async function verifyUrl(url: string): Promise<boolean> {
     let response = await fetch(url, {
       method: 'HEAD',
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)' },
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(4_000),
     });
     if (response.status === 405) {
       response = await fetch(url, {
         method: 'GET',
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)' },
-        signal: AbortSignal.timeout(8_000),
+        signal: AbortSignal.timeout(4_000),
       });
     }
     return response.status >= 200 && response.status < 300;
@@ -171,7 +171,7 @@ async function fetchRssItems(feedUrl: string): Promise<RssItem[]> {
       items.push({ url, title, description, outlet, pubDate });
     }
 
-    return items.slice(0, 8);
+    return items.slice(0, 5);
   } catch {
     return [];
   }
@@ -248,7 +248,7 @@ FUENTE:
 URL: ${sourceUrl}
 ${contextBlock}
 ---
-${content.body.slice(0, 8000)}
+${content.body.slice(0, 5000)}
 ---
 
 Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta (sin markdown, sin comentarios):
@@ -309,6 +309,21 @@ Criterios de severidad:
 Extrae TODAS las personas mencionadas y sus relaciones aunque el documento no sea explícitamente sobre corrupción — las conexiones entre funcionarios y empresas son valiosas.`;
 }
 
+// ── Bulk-load known source URLs from the last 60 days ─────────────────────────
+// Called once per run before any AI work so we can skip articles that are
+// already stored in the sources table without touching Gemini at all.
+
+async function loadKnownUrls(
+  supabase: ReturnType<typeof createClient>
+): Promise<Set<string>> {
+  const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase
+    .from('sources')
+    .select('url')
+    .gte('created_at', cutoff);
+  return new Set(data?.map((s: { url: string }) => s.url) ?? []);
+}
+
 // ── Helper: deduplicate against existing findings ─────────────────────────────
 
 async function isDuplicate(
@@ -347,14 +362,15 @@ async function clusterItemsIntoGroups(
     .join('\n');
 
   try {
-    const text = await callGemini(apiKey, `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
+    const clusterPrompt = `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
 
 ${itemList}
 
 Responde ÚNICAMENTE con JSON válido (sin markdown ni comentarios):
 {"groups":[[0,3,7],[1,2],[4],[5,6],...]}
 
-Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`);
+Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`;
+    const text = await callGemini(apiKey, clusterPrompt, 30_000);
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON object in clustering response');
@@ -382,19 +398,17 @@ Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`);
 }
 
 // ── Resolve and merge content for a group of items ────────────────────────────
+// Uses RSS metadata only (title + description) — avoids slow/blocked article
+// fetches and keeps Gemini prompts short so each extraction call is ~5-10s
+// instead of ~25-35s, allowing 3x more groups per run.
 
-async function resolveGroupContent(group: RssItem[]): Promise<ArticleContent> {
-  const contents = await Promise.all(group.map(item => resolveRssContent(item)));
-
-  if (group.length === 1) return contents[0];
-
-  const title = contents.find(c => c.title)?.title || group[0].title;
-  const description = contents.find(c => c.description)?.description || group[0].description;
-  const body = contents
-    .map((c, i) => `=== FUENTE ${i + 1} (${group[i].outlet}) ===\n${c.body}`)
+function resolveGroupContent(group: RssItem[]): ArticleContent {
+  const title = group[0].title;
+  const description = group.find(i => i.description)?.description ?? '';
+  const body = group
+    .map(item => `${item.outlet}: ${item.title}${item.description ? '\n' + item.description : ''}`)
     .join('\n\n')
-    .slice(0, 10000);
-
+    .slice(0, 3000);
   return { title, description, body };
 }
 
@@ -426,13 +440,13 @@ async function upsertPerson(
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-async function callGemini(apiKey: string, prompt: string): Promise<string> {
+async function callGemini(apiKey: string, prompt: string, timeoutMs = 55_000): Promise<string> {
   const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
   const headers = { 'Content-Type': 'application/json' };
 
   let res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method: 'POST', headers, body,
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (res.status === 429) {
@@ -440,7 +454,7 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
     await new Promise(r => setTimeout(r, 6000));
     res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: 'POST', headers, body,
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   }
 
@@ -577,6 +591,49 @@ async function processArticle(
   return true;
 }
 
+// ── Pre-screen raw articles for relevance by title ────────────────────────────
+// Runs BEFORE clustering so the clustering call only receives relevant articles.
+// One cheap Gemini call (titles only, no body) filters out ~70-80% of irrelevant
+// articles (sports, weather, entertainment, etc.), keeping the clustering prompt
+// small enough to avoid timeouts.
+
+async function preScreenArticles(
+  apiKey: string,
+  items: RssItem[]
+): Promise<RssItem[]> {
+  if (items.length === 0) return [];
+
+  const itemList = items
+    .map((item, i) => `[${i}] ${item.title}${item.description ? ' — ' + item.description.slice(0, 80) : ''}`)
+    .join('\n');
+
+  try {
+    const screenPrompt = `Eres un filtro de relevancia rápido. Analiza los siguientes titulares de artículos de noticias panameñas y devuelve SOLO los índices de artículos que probablemente cubran alguno de estos temas:
+- Corrupción, peculado, soborno, fraude, lavado de dinero
+- Contratos o licitaciones irregulares, uso indebido de fondos públicos
+- Funcionarios imputados, detenidos o investigados
+- Abuso, negligencia o maltrato en instituciones del Estado (SENNIAF, hospitales, cárceles)
+- Violaciones de derechos humanos por entidades gubernamentales
+- Irregularidades en contrataciones, concesiones o adquisiciones públicas
+
+${itemList}
+
+Responde ÚNICAMENTE con JSON válido (sin markdown): {"relevant":[0,5,12,...]}
+Excluye deportes, entretenimiento, accidentes de tráfico sin funcionarios implicados, clima, o eventos puramente privados.`;
+    const text = await callGemini(apiKey, screenPrompt, 30_000);
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in pre-screen response');
+    const { relevant } = JSON.parse(jsonMatch[0]) as { relevant: number[] };
+    const valid = relevant.filter(i => Number.isInteger(i) && i >= 0 && i < items.length);
+    console.log(`Pre-screened: ${valid.length} of ${items.length} articles are relevant (${Math.round(valid.length / items.length * 100)}%)`);
+    return valid.map(i => items[i]);
+  } catch (e) {
+    console.warn('Pre-screening failed, processing all articles:', e);
+    return items;
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -614,7 +671,7 @@ Deno.serve(async (req: Request) => {
     );
     console.log(`RSS fetch complete. Deduplicating…`);
 
-    // Step 2: flatten + deduplicate by URL
+    // Step 2: flatten + deduplicate by URL (in-memory, within this run)
     const processedUrls = new Set<string>();
     const queue: RssItem[] = [];
     for (const items of feedResults) {
@@ -624,25 +681,42 @@ Deno.serve(async (req: Request) => {
         queue.push(item);
       }
     }
-    console.log(`${queue.length} unique articles to process`);
+    console.log(`${queue.length} unique articles fetched`);
 
-    // Step 3: cluster items into topic groups (one Claude call)
-    const groups = await clusterItemsIntoGroups(geminiKey, queue);
+    // Step 3: filter out articles already stored in the sources table
+    const knownUrls = await loadKnownUrls(supabase);
+    const freshQueue = queue.filter(item => !knownUrls.has(item.url));
+    console.log(`Skipped ${queue.length - freshQueue.length} already-known articles — ${freshQueue.length} new articles to process`);
 
-    // Step 4: process groups in parallel batches, respecting a time budget
-    const BATCH_SIZE = 6;
-    const TIME_BUDGET_MS = 80_000;
+    // Step 4: pre-screen raw articles by title before clustering
+    // (keeps the clustering prompt small — avoids its timeout)
+    const relevantArticles = await preScreenArticles(geminiKey, freshQueue);
 
-    for (let i = 0; i < groups.length; i += BATCH_SIZE) {
+    // Step 6: cluster only relevant articles into topic groups
+    const groups = await clusterItemsIntoGroups(geminiKey, relevantArticles);
+
+    // Step 7: process groups in parallel batches, respecting a time budget
+    // Hard cap ensures the function always finishes. Run the cron more
+    // frequently (e.g. every 4-6h) to cover more articles per day.
+    const BATCH_SIZE = 5;
+    const TIME_BUDGET_MS = 110_000;
+    const MAX_GROUPS_PER_RUN = 25;
+
+    const toProcess = groups.slice(0, MAX_GROUPS_PER_RUN);
+    if (groups.length > MAX_GROUPS_PER_RUN) {
+      console.log(`Capping at ${MAX_GROUPS_PER_RUN} of ${groups.length} groups this run`);
+    }
+
+    for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
       if (Date.now() - startTime > TIME_BUDGET_MS) {
-        console.log(`Time budget reached after ${i} of ${groups.length} groups — stopping early`);
+        console.log(`Time budget reached after ${i} of ${toProcess.length} groups — stopping early`);
         break;
       }
-      const batch = groups.slice(i, i + BATCH_SIZE);
+      const batch = toProcess.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(batch.map(async (group) => {
         articlesFound += group.length;
         console.log(`  Processing group (${group.length} article${group.length > 1 ? 's' : ''}): ${group[0].title || group[0].url}`);
-        const content = await resolveGroupContent(group);
+        const content = resolveGroupContent(group);
         return processArticle(supabase, geminiKey, group, content);
       }));
       findingsCreated += results.filter(Boolean).length;
