@@ -39,7 +39,7 @@ async function fetchFindings(filters: FindingFilters = {}): Promise<Finding[]> {
 async function fetchDashboardStats(): Promise<DashboardStats> {
   const { data: findings, error } = await supabase
     .from('findings')
-    .select('*, sources(*)')
+    .select('*, sources(*), people:finding_people(*, person:people(*))')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -52,7 +52,7 @@ async function fetchDashboardStats(): Promise<DashboardStats> {
   };
 
   const all = (findings as Finding[]).sort((a, b) => latestPublishedAt(b) - latestPublishedAt(a));
-  const recentFindings = all.slice(0, 12);
+  const recentFindings = all;
 
   const totalAmount = all.reduce((sum, f) => sum + (f.amount_usd ?? 0), 0);
 

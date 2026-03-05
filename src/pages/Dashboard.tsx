@@ -1,15 +1,37 @@
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp, DollarSign, AlertTriangle, FileSearch, ArrowRight } from 'lucide-react';
 import { useDashboardStats } from '../hooks/useFindings';
 import { FindingCard } from '../components/findings/FindingCard';
+import { FindingFilters } from '../components/findings/FindingFilters';
 import { FindingCardSkeleton } from '../components/ui/Skeleton';
 import { formatMoney, SEVERITY_LABELS, SEVERITY_COLORS } from '../lib/utils';
-import { type Severity } from '../types';
+import { type Severity, type FindingFilters as Filters } from '../types';
 
 const SEVERITIES: Severity[] = ['critico', 'alto', 'medio', 'bajo'];
 
 export function Dashboard() {
   const { data: stats, isLoading, error } = useDashboardStats();
+
+  const [filters, setFilters] = useState<Filters>({
+    severity: '', category: '', search: '', dateFrom: '', dateTo: '',
+  });
+
+  const hasFilters = !!(filters.severity || filters.category || filters.search || filters.dateFrom || filters.dateTo);
+
+  const displayFindings = useMemo(() => {
+    const all = stats?.recent_findings ?? [];
+    if (!hasFilters) return all.slice(0, 12);
+
+    return all.filter(f => {
+      if (filters.severity && f.severity !== filters.severity) return false;
+      if (filters.category && f.category !== filters.category) return false;
+      if (filters.search && !f.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+      if (filters.dateFrom && (f.date_reported ?? '') < filters.dateFrom) return false;
+      if (filters.dateTo && (f.date_reported ?? '') > filters.dateTo) return false;
+      return true;
+    });
+  }, [stats?.recent_findings, filters, hasFilters]);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
@@ -101,10 +123,12 @@ export function Dashboard() {
         </div>
       </section>
 
-      {/* Recent findings */}
+      {/* Findings with filters */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Hallazgos Recientes</h2>
+          <h2 className="text-lg font-semibold text-white">
+            {hasFilters ? 'Hallazgos' : 'Hallazgos Recientes'}
+          </h2>
           <Link
             to="/hallazgos"
             className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors"
@@ -113,19 +137,34 @@ export function Dashboard() {
           </Link>
         </div>
 
+        <FindingFilters filters={filters} onChange={setFilters} />
+
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm mt-4">
             Error al cargar los datos. Verifica tu conexión a Supabase.
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {!isLoading && hasFilters && (
+          <p className="text-sm text-gray-500 mt-4">
+            {displayFindings.length} {displayFindings.length === 1 ? 'hallazgo encontrado' : 'hallazgos encontrados'}
+          </p>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {isLoading
             ? Array.from({ length: 6 }).map((_, i) => <FindingCardSkeleton key={i} />)
-            : stats?.recent_findings.map((finding) => (
+            : displayFindings.map((finding) => (
                 <FindingCard key={finding.id} finding={finding} />
               ))}
         </div>
+
+        {!isLoading && hasFilters && displayFindings.length === 0 && (
+          <div className="text-center py-16 text-gray-500">
+            <p className="text-lg font-medium">No se encontraron hallazgos</p>
+            <p className="text-sm mt-1">Intenta ajustar los filtros</p>
+          </div>
+        )}
       </section>
 
       {/* Source note */}
