@@ -81,9 +81,8 @@ export function FindingDetail() {
   const grouped = groupReactions(reactions);
   const severityColor = SEVERITY_COLORS[finding.severity];
 
-  const myReactionEmojis = new Set(
-    reactions.filter((r) => r.user_id === user?.id).map((r) => r.emoji)
-  );
+  const myReactions = reactions.filter((r) => r.user_id === user?.id);
+  const myReactionEmojis = new Set(myReactions.map((r) => r.emoji));
 
   const displayName =
     user?.user_metadata?.full_name ??
@@ -92,15 +91,22 @@ export function FindingDetail() {
     'Usuario';
 
   const handleReaction = (emoji: string) => {
-    if (!user) {
-      openAuthModal();
-      return;
-    }
+    if (!user) { openAuthModal(); return; }
     if (myReactionEmojis.has(emoji)) {
       removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
-    } else {
-      addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+      setShowPicker(false);
+      return;
     }
+    if (myReactions.length >= 3) {
+      const oldest = [...myReactions].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+      removeReaction.mutateAsync({ findingId: finding.id, emoji: oldest.emoji, userId: user.id })
+        .then(() => addReaction.mutate({ findingId: finding.id, emoji, userId: user.id }));
+      setShowPicker(false);
+      return;
+    }
+    addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
     setShowPicker(false);
   };
 
@@ -171,8 +177,8 @@ export function FindingDetail() {
         </div>
       </header>
 
-      {/* Summary */}
-      <section className="bg-dark-800 border border-dark-600 rounded-xl p-6">
+      {/* Summary + floating reactions */}
+      <section className="relative bg-dark-800 border border-dark-600 rounded-xl p-6 pb-10">
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Resumen
         </h2>
@@ -188,7 +194,48 @@ export function FindingDetail() {
             Fuente principal
           </a>
         )}
+
+        {/* Reactions — float on bottom-left border */}
+        <div className="absolute bottom-0 left-6 translate-y-1/2 flex flex-wrap items-center gap-1.5">
+          {grouped.map(([emoji, count]) => {
+            const mine = myReactionEmojis.has(emoji);
+            return (
+              <button
+                key={emoji}
+                onClick={() => handleReaction(emoji)}
+                title={mine ? 'Quitar reacción' : undefined}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors shadow-sm ${
+                  mine
+                    ? 'bg-blue-900 border-blue-600 text-blue-200 hover:bg-blue-800'
+                    : 'bg-dark-800 border-dark-600 hover:bg-dark-700 hover:border-dark-500 text-gray-300'
+                }`}
+              >
+                <span>{emoji}</span>
+                <span className={`font-mono text-xs ${mine ? 'text-blue-300' : 'text-gray-400'}`}>{count}</span>
+              </button>
+            );
+          })}
+          <button
+            ref={pickerBtnRef}
+            onClick={() => {
+              if (!user) { openAuthModal(); return; }
+              setShowPicker((v) => !v);
+            }}
+            className="flex items-center gap-1 px-3 py-1 bg-dark-800 hover:bg-dark-700 border border-dark-600 hover:border-dark-500 rounded-full text-sm text-gray-500 hover:text-gray-300 transition-colors shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="text-xs">Reaccionar</span>
+          </button>
+        </div>
       </section>
+
+      {showPicker && (
+        <EmojiPickerPortal
+          anchor={pickerBtnRef.current}
+          onSelect={handleReaction}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
 
       {/* People involved */}
       {people.length > 0 && (
@@ -278,49 +325,6 @@ export function FindingDetail() {
         </section>
       )}
 
-      {/* Reactions */}
-      <section className="bg-dark-800 border border-dark-600 rounded-xl p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          {grouped.map(([emoji, count]) => {
-            const mine = myReactionEmojis.has(emoji);
-            return (
-              <button
-                key={emoji}
-                onClick={() => handleReaction(emoji)}
-                title={mine ? 'Quitar reacción' : undefined}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors ${
-                  mine
-                    ? 'bg-blue-500/20 border-blue-500/40 text-blue-200 hover:bg-blue-500/30'
-                    : 'bg-dark-700 border-dark-600 hover:bg-dark-600 hover:border-blue-500/50 text-gray-300'
-                }`}
-              >
-                <span>{emoji}</span>
-                <span className={`font-mono text-xs ${mine ? 'text-blue-300' : 'text-gray-400'}`}>{count}</span>
-              </button>
-            );
-          })}
-
-          <button
-            ref={pickerBtnRef}
-            onClick={() => {
-              if (!user) { openAuthModal(); return; }
-              setShowPicker((v) => !v);
-            }}
-            className="flex items-center gap-1 px-3 py-1 bg-dark-700 hover:bg-dark-600 border border-dark-600 hover:border-blue-500/50 rounded-full text-sm text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="text-xs">Reaccionar</span>
-          </button>
-        </div>
-
-        {showPicker && (
-          <EmojiPickerPortal
-            anchor={pickerBtnRef.current}
-            onSelect={handleReaction}
-            onClose={() => setShowPicker(false)}
-          />
-        )}
-      </section>
 
       {/* Comments */}
       <section>

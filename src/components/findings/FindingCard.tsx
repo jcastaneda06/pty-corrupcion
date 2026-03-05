@@ -27,50 +27,46 @@ export function FindingCard({ finding }: Props) {
   const convicted = people.filter((fp) => fp.is_convicted).length;
   const grouped = groupReactions(finding.reactions ?? []);
 
-  const myReactionEmojis = new Set(
-    (finding.reactions ?? []).filter((r) => r.user_id === user?.id).map((r) => r.emoji)
-  );
+  const myReactions = (finding.reactions ?? []).filter((r) => r.user_id === user?.id);
+  const myReactionEmojis = new Set(myReactions.map((r) => r.emoji));
 
   const [showPicker, setShowPicker] = useState(false);
   const pickerBtnRef = useRef<HTMLButtonElement>(null);
   const addReaction = useAddReaction();
   const removeReaction = useRemoveReaction();
 
+  const doReaction = (emoji: string) => {
+    if (!user) { openAuthModal(); return; }
+    if (myReactionEmojis.has(emoji)) {
+      removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+      return;
+    }
+    if (myReactions.length >= 3) {
+      const oldest = [...myReactions].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+      removeReaction.mutateAsync({ findingId: finding.id, emoji: oldest.emoji, userId: user.id })
+        .then(() => addReaction.mutate({ findingId: finding.id, emoji, userId: user.id }));
+      return;
+    }
+    addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
+  };
+
   const handleReaction = (e: React.MouseEvent, emoji: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!user) {
-      openAuthModal();
-      return;
-    }
-    if (myReactionEmojis.has(emoji)) {
-      removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
-    } else {
-      addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
-    }
+    doReaction(emoji);
   };
 
   const handlePickerSelect = (emoji: string) => {
-    if (!user) {
-      openAuthModal();
-      setShowPicker(false);
-      return;
-    }
-    if (myReactionEmojis.has(emoji)) {
-      removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
-    } else {
-      addReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
-    }
+    doReaction(emoji);
     setShowPicker(false);
   };
 
   const togglePicker = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!user) {
-      openAuthModal();
-      return;
-    }
+    if (!user) { openAuthModal(); return; }
     setShowPicker((v) => !v);
   };
 
