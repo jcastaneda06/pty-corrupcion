@@ -44,7 +44,14 @@ async function fetchDashboardStats(): Promise<DashboardStats> {
 
   if (error) throw error;
 
-  const all = findings as Finding[];
+  const latestPublishedAt = (f: Finding): number => {
+    const dates = (f.sources ?? [])
+      .map(s => s.published_at ? new Date(s.published_at).getTime() : 0)
+      .filter(d => d > 0);
+    return dates.length > 0 ? Math.max(...dates) : new Date(f.created_at).getTime();
+  };
+
+  const all = (findings as Finding[]).sort((a, b) => latestPublishedAt(b) - latestPublishedAt(a));
   const recentFindings = all.slice(0, 12);
 
   const totalAmount = all.reduce((sum, f) => sum + (f.amount_usd ?? 0), 0);

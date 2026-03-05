@@ -1,118 +1,48 @@
 # PTY Corrupción
 
-A real-time corruption tracking dashboard for Panama. News articles are automatically scraped from Google News RSS feeds, analyzed by Gemini AI, and stored as structured findings with associated people, relationships, and sources.
+A real-time corruption tracking dashboard for Panama. News articles are automatically scraped, analyzed by AI, and surfaced as structured cases with people, money trails, and source links.
 
-## What it does
+## How it works
 
-- **Automated scraping** — a Supabase Edge Function runs on a cron schedule, fetches Panama-related news from ~36 Google News RSS queries, filters out irrelevant articles, clusters articles about the same case, and uses Gemini 2.5 Flash to extract structured corruption findings
-- **Findings database** — each case is stored with severity (`critico` / `alto` / `medio` / `bajo`), category, dollar amounts, dates, involved people, and source URLs
-- **Relationship graph** — people mentioned across findings are linked by relationship type (family, business, political, employer, etc.) and visualized as a node graph
-- **Corruption Index** — historical chart of Panama's Transparency International CPI score (2012–2024) overlaid with presidential terms and public debt
+### Automated data collection
+
+A Supabase Edge Function runs on a cron schedule and feeds the database automatically:
+
+1. **Fetch** — ~36 Google News RSS queries covering Panama corruption, government misconduct, public procurement fraud, and institutional abuse (SENNIAF, hospitals, prisons, etc.)
+2. **Deduplicate** — articles already in the database are skipped using a URL lookup against the `sources` table
+3. **Pre-screen** — one Gemini call reads all article titles and discards irrelevant results (sports, weather, traffic) before any expensive processing happens
+4. **Cluster** — a second Gemini call groups articles about the same case together so they produce one consolidated finding instead of duplicates
+5. **Extract** — for each group, Gemini reads the RSS title and description and returns structured JSON: title, summary, severity, category, dollar amount, date, involved people, and their relationships
+6. **Persist** — findings, sources, people, and relationships are inserted into Postgres; the run is logged to `scrape_log`
+
+### Severity levels
+
+Each finding is classified by Gemini at ingestion time:
+
+| Level | Criteria |
+|---|---|
+| `critico` | >$1M involved, multiple officials, confirmed criminal charges |
+| `alto` | Confirmed corruption, significant amounts or senior officials |
+| `medio` | Under formal investigation, credible evidence but no conviction |
+| `bajo` | Minor administrative irregularities, early-stage alerts |
+
+### Categories
+
+Cases are bucketed into one of ten categories: Fraude en Contratación Pública, Peculado / Malversación, Lavado de Dinero, Soborno / Cohecho, Tráfico de Influencias, Captura del Estado, Abuso en Emergencias, Corrupción en Seguridad, Negligencia y Abuso Institucional, Violación de Derechos Humanos.
+
+### People and relationships
+
+Every person extracted from an article is upserted into a shared `people` table by name. If the same person appears across multiple findings they accumulate a full case history. Relationships between people (family, business partners, political ties, employer/employee) are stored as graph edges and visualized as an interactive network on each person's profile page.
+
+### Corruption Index
+
+The `/indice` page shows Panama's historical score on Transparency International's Corruption Perceptions Index from 2012 to 2024, overlaid with presidential terms and public debt as a percentage of GDP.
 
 ## Stack
 
-- **Frontend** — React 18, TypeScript, Vite, Tailwind CSS
-- **Data fetching** — TanStack React Query (5-minute stale time)
-- **Routing** — React Router v6 (`/`, `/hallazgos`, `/hallazgos/:id`, `/personas/:id`, `/indice`)
-- **Charts** — Recharts (CPI history), @xyflow/react (relationship graph)
-- **Backend** — Supabase (Postgres + Edge Functions + Row Level Security)
-- **AI** — Google Gemini 2.5 Flash (article extraction and clustering)
-- **Deployment** — Vercel (frontend)
-
-## Getting started
-
-### 1. Clone and install
-
-```bash
-git clone <repo-url>
-cd pty-corrupcion
-npm install
-```
-
-### 2. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Fill in `.env`:
-
-```
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
-```
-
-For the `merge-duplicate-findings` script only, also add:
-```
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-### 3. Set up the database
-
-```bash
-supabase db push
-# or apply migrations manually:
-# supabase/migrations/001_schema.sql
-# supabase/migrations/002_seed.sql
-# supabase/migrations/003_fix_sources.sql
-```
-
-### 4. Deploy the edge function
-
-```bash
-supabase functions deploy scrape-analyze
-supabase secrets set GEMINI_API_KEY=AIza...
-```
-
-### 5. Run locally
-
-```bash
-npm run dev
-```
-
-## Scraping pipeline
-
-The `scrape-analyze` edge function processes articles in this order:
-
-1. Fetch ~36 Google News RSS feeds in parallel (5 articles each)
-2. Deduplicate by URL in memory
-3. Filter out URLs already in the `sources` table (last 60 days)
-4. **Pre-screen** remaining articles with one Gemini call — drops irrelevant articles (sports, weather, etc.) based on title/description only
-5. **Cluster** the relevant articles into topic groups with one Gemini call — articles about the same case are merged
-6. **Extract** each group: Gemini reads RSS title + description and returns structured JSON (title, summary, severity, category, amount, people, relationships)
-7. Insert findings, sources, people, and relationships into the database
-
-A hard cap of 25 groups per run keeps execution within Supabase's wall-clock limits. Run the function every 4–6 hours via pg_cron for full daily coverage.
-
-## Utility scripts
-
-**Merge duplicate findings** (one-time cleanup):
-
-```bash
-node scripts/merge-duplicate-findings.mjs [--dry-run]
-```
-
-Uses Claude to cluster existing findings by topic, picks a winner per group by severity, rewrites a consolidated summary, moves all sources and people to the winner, and deletes duplicates.
-
-**Backfill source titles**:
-
-```bash
-curl -X POST https://<project>.supabase.co/functions/v1/backfill-source-titles
-# or: supabase functions invoke backfill-source-titles
-```
-
-Fills in null `title` fields in the `sources` table by fetching the HTML `<title>` tag from each URL.
-
-## Database schema
-
-| Table | Description |
-|---|---|
-| `findings` | Corruption cases — title, summary, severity, category, amount, dates |
-| `people` | Individuals mentioned across cases |
-| `finding_people` | Junction: who appears in which finding, their role, conviction status |
-| `person_relationships` | Graph edges between people (family, business, political, etc.) |
-| `sources` | News article URLs and metadata per finding |
-| `scrape_log` | Audit log of each automated scrape run |
-
-All tables are publicly readable via RLS. Writes require the service role key (edge functions only).
+- **Frontend** — React 18, TypeScript, Vite, Tailwind CSS, React Router v6
+- **Data fetching** — TanStack React Query
+- **Visualizations** — Recharts (CPI chart), @xyflow/react (relationship graph)
+- **Backend** — Supabase (Postgres, Edge Functions, Row Level Security)
+- **AI** — Google Gemini 2.5 Flash
+- **Deployment** — Vercel
