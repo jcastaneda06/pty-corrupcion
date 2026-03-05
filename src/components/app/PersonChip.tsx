@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import { type Person } from '../../types';
-import { getInitials } from '../../lib/utils';
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { type Person } from "@/types";
+import { getInitials } from "@/lib/utils";
 
 interface Props {
   person: Person;
@@ -14,9 +15,11 @@ export function PersonChip({ person, showAmount, showConvicted }: Props) {
       to={`/personas/${person.id}`}
       className="inline-flex items-center gap-1.5 bg-dark-700 hover:bg-dark-600 border border-dark-500 hover:border-blue-500/50 rounded-full pl-1 pr-2.5 py-0.5 transition-colors text-sm"
     >
-      <span className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-        {getInitials(person.name)}
-      </span>
+      <Avatar className="w-5 h-5 shrink-0">
+        <AvatarFallback className="bg-blue-600 text-white text-[9px] font-bold">
+          {getInitials(person.name)}
+        </AvatarFallback>
+      </Avatar>
       <span className="text-gray-300 truncate max-w-[140px]">{person.name}</span>
       {showConvicted && (
         <span className="ml-0.5 text-red-400 text-xs font-bold">✓</span>

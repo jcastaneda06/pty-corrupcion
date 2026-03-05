@@ -4,7 +4,7 @@ import { FileText } from 'lucide-react';
 import { useFindings } from '../hooks/useFindings';
 import { FindingCard } from '../components/findings/FindingCard';
 import { FindingFilters as FiltersComponent } from '../components/findings/FindingFilters';
-import { FindingCardSkeleton } from '../components/ui/Skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { type FindingFilters, type Severity } from '../types';
 
 export function Findings() {
@@ -59,7 +59,23 @@ export function Findings() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading
-          ? Array.from({ length: 9 }).map((_, i) => <FindingCardSkeleton key={i} />)
+          ? Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="bg-dark-800 border border-dark-600 rounded-xl p-5 space-y-3 animate-pulse">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="h-5 bg-dark-700 rounded w-3/4" />
+                  <div className="h-5 bg-dark-700 rounded w-16" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-3 bg-dark-700 w-full" />
+                  <Skeleton className="h-3 bg-dark-700 w-5/6" />
+                  <Skeleton className="h-3 bg-dark-700 w-4/6" />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <div className="h-5 bg-dark-700 rounded w-24" />
+                  <div className="h-5 bg-dark-700 rounded w-20" />
+                </div>
+              </div>
+            ))
           : findings?.map((finding) => (
               <FindingCard key={finding.id} finding={finding} />
             ))}

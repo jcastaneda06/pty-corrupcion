@@ -1,4 +1,10 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 import { type Severity } from '../types';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export const SEVERITY_COLORS: Record<Severity, string> = {
   critico: '#EF4444',
@@ -92,9 +98,3 @@ export function getInitials(name: string): string {
     .join('');
 }
 
-/**
- * cn — simple class name joiner (no clsx needed)
- */
-export function cn(...classes: (string | undefined | false | null)[]): string {
-  return classes.filter(Boolean).join(' ');
-}

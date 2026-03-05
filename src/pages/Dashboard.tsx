@@ -4,10 +4,11 @@ import { ArrowRight, BarChart2 } from 'lucide-react';
 import { useDashboardStats } from '../hooks/useFindings';
 import { FindingCard } from '../components/findings/FindingCard';
 import { FindingFilters } from '../components/findings/FindingFilters';
-import { FindingCardSkeleton } from '../components/ui/Skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatMoney } from '../lib/utils';
 import { type FindingFilters as Filters } from '../types';
-import { Tooltip } from '../components/ui/Tooltip';
 
 export function Dashboard() {
   const { data: stats, isLoading, error } = useDashboardStats();
@@ -32,6 +33,7 @@ export function Dashboard() {
     });
   }, [stats?.recent_findings, filters, hasFilters]);
 
+  console.log(stats?.total_amount_usd);
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
       {/* Hero */}
@@ -54,28 +56,33 @@ export function Dashboard() {
       </section>
 
       {/* Compact stats strip */}
-      <section className="bg-dark-800 border border-dark-700 rounded-xl px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
-        <Stat label="Hallazgos" value={isLoading ? '…' : String(stats?.total_findings ?? 0)} color="text-white" />
-        <div className="hidden sm:block w-px h-7 bg-dark-600" />
-        <Tooltip content={stats?.total_amount_usd ?? null}>
-          <Stat label="Comprometido" value={isLoading ? '…' : formatMoney(stats?.total_amount_usd ?? 0)} color="text-emerald-400" />
-        </Tooltip>
-        <div className="hidden sm:block w-px h-7 bg-dark-600" />
-        <Tooltip content={stats?.by_severity.critico ? String(stats?.by_severity.critico ?? 0) : null}>
+      <Card className="bg-dark-800 border-dark-700">
+        <CardContent className="px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Stat label="Hallazgos" value={isLoading ? '…' : String(stats?.total_findings ?? 0)} color="text-white" />
+          <div className="hidden sm:block w-px h-7 bg-dark-600" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Stat label="Comprometido" value={isLoading ? '…' : formatMoney(stats?.total_amount_usd ?? 0)} color="text-emerald-400" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="bg-dark-700 border-dark-500 text-gray-200">
+              {`$${Number(stats?.total_amount_usd).toLocaleString('es-PA')}`}
+            </TooltipContent>
+          </Tooltip>
+          <div className="hidden sm:block w-px h-7 bg-dark-600" />
           <Stat label="Críticos" value={isLoading ? '…' : String(stats?.by_severity.critico ?? 0)} color="text-red-400" />
-        </Tooltip>
-        <div className="hidden sm:block w-px h-7 bg-dark-600" />
-        <Tooltip content={stats?.by_severity.medio ? String(stats?.by_severity.medio ?? 0) : null}>
+          <div className="hidden sm:block w-px h-7 bg-dark-600" />
           <Stat label="En investigación" value={isLoading ? '…' : String(stats?.by_severity.medio ?? 0)} color="text-yellow-400" />
-        </Tooltip>
-        <Link
-          to="/estadisticas"
-          className="ml-auto flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"
-        >
-          <BarChart2 className="w-4 h-4" />
-          Ver estadísticas
-        </Link>
-      </section>
+          <Link
+            to="/estadisticas"
+            className="ml-auto flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            <BarChart2 className="w-4 h-4" />
+            Ver estadísticas
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Findings with filters */}
       <section>
@@ -107,10 +114,26 @@ export function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {isLoading
-            ? Array.from({ length: 6 }).map((_, i) => <FindingCardSkeleton key={i} />)
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-dark-800 border border-dark-600 rounded-xl p-5 space-y-3 animate-pulse">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="h-5 bg-dark-700 rounded w-3/4" />
+                    <div className="h-5 bg-dark-700 rounded w-16" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 bg-dark-700 w-full" />
+                    <Skeleton className="h-3 bg-dark-700 w-5/6" />
+                    <Skeleton className="h-3 bg-dark-700 w-4/6" />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <div className="h-5 bg-dark-700 rounded w-24" />
+                    <div className="h-5 bg-dark-700 rounded w-20" />
+                  </div>
+                </div>
+              ))
             : displayFindings.map((finding) => (
-                <FindingCard key={finding.id} finding={finding} />
-              ))}
+              <FindingCard key={finding.id} finding={finding} />
+            ))}
         </div>
 
         {!isLoading && hasFilters && displayFindings.length === 0 && (

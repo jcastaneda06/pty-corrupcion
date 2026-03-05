@@ -19,11 +19,14 @@ import { es } from 'date-fns/locale';
 import { useFinding, useFindingRelationships } from '../hooks/useFinding';
 import { useAddFindingComment, useAddReaction, useRemoveReaction } from '../hooks/useFindingComments';
 import { RelationshipMap } from '../components/findings/RelationshipMap';
-import { SeverityBadge } from '../components/ui/SeverityBadge';
-import { EmojiPickerPortal } from '../components/ui/EmojiPickerPortal';
-import { MoneyAmount } from '../components/ui/MoneyAmount';
-import { PersonChip } from '../components/ui/PersonChip';
-import { Skeleton } from '../components/ui/Skeleton';
+import { SeverityBadge } from '@/components/app/SeverityBadge';
+import { EmojiPickerPortal } from '@/components/app/EmojiPickerPortal';
+import { MoneyAmount } from '@/components/app/MoneyAmount';
+import { PersonChip } from '@/components/app/PersonChip';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { formatDate, getInitials, SEVERITY_COLORS } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { type Reaction } from '../types';
@@ -52,11 +55,11 @@ export function FindingDetail() {
   if (isLoading) {
     return (
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-5/6" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-6 w-32 bg-dark-700" />
+        <Skeleton className="h-8 w-3/4 bg-dark-700" />
+        <Skeleton className="h-4 w-full bg-dark-700" />
+        <Skeleton className="h-4 w-5/6 bg-dark-700" />
+        <Skeleton className="h-64 w-full bg-dark-700" />
       </main>
     );
   }
@@ -239,43 +242,45 @@ export function FindingDetail() {
 
       {/* People involved */}
       {people.length > 0 && (
-        <section className="bg-dark-800 border border-dark-600 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Personas Involucradas ({people.length})
-          </h2>
-          <div className="space-y-3">
-            {people.map((fp) => (
-              fp.person && (
-                <div
-                  key={fp.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-dark-700 last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <PersonChip
-                      person={fp.person}
-                      showAmount={fp.amount_usd}
-                      showConvicted={fp.is_convicted}
-                    />
-                    {fp.role_in_case && (
-                      <span className="text-xs text-gray-500">{fp.role_in_case}</span>
-                    )}
+        <Card className="bg-dark-800 border-dark-600">
+          <CardContent className="p-6">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Personas Involucradas ({people.length})
+            </h2>
+            <div className="space-y-3">
+              {people.map((fp) => (
+                fp.person && (
+                  <div
+                    key={fp.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-dark-700 last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <PersonChip
+                        person={fp.person}
+                        showAmount={fp.amount_usd}
+                        showConvicted={fp.is_convicted}
+                      />
+                      {fp.role_in_case && (
+                        <span className="text-xs text-gray-500">{fp.role_in_case}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {fp.is_convicted && (
+                        <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/30 rounded px-2 py-0.5">
+                          Condenado
+                        </span>
+                      )}
+                      {fp.amount_usd && (
+                        <MoneyAmount amount={fp.amount_usd} className="text-sm" />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {fp.is_convicted && (
-                      <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/30 rounded px-2 py-0.5">
-                        Condenado
-                      </span>
-                    )}
-                    {fp.amount_usd && (
-                      <MoneyAmount amount={fp.amount_usd} className="text-sm" />
-                    )}
-                  </div>
-                </div>
-              )
-            ))}
-          </div>
-        </section>
+                )
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Relationship map */}
@@ -295,34 +300,36 @@ export function FindingDetail() {
 
       {/* Sources */}
       {sources.length > 0 && (
-        <section className="bg-dark-800 border border-dark-600 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Newspaper className="w-4 h-4" />
-            Fuentes ({sources.length})
-          </h2>
-          <ul className="space-y-2.5">
-            {sources.map((source) => (
-              <li key={source.id} className="flex items-start gap-2 min-w-0">
-                <ExternalLink className="w-3.5 h-3.5 text-gray-600 flex-shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors hover:underline break-all"
-                  >
-                    {source.title ?? source.url}
-                  </a>
-                  <div className="text-xs text-gray-600 mt-0.5">
-                    {source.outlet && <span>{source.outlet}</span>}
-                    {source.outlet && source.published_at && <span> · </span>}
-                    {source.published_at && <span>{formatDate(source.published_at)}</span>}
+        <Card className="bg-dark-800 border-dark-600">
+          <CardContent className="p-6">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Newspaper className="w-4 h-4" />
+              Fuentes ({sources.length})
+            </h2>
+            <ul className="space-y-2.5">
+              {sources.map((source) => (
+                <li key={source.id} className="flex items-start gap-2 min-w-0">
+                  <ExternalLink className="w-3.5 h-3.5 text-gray-600 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 transition-colors hover:underline break-all"
+                    >
+                      {source.title ?? source.url}
+                    </a>
+                    <div className="text-xs text-gray-600 mt-0.5">
+                      {source.outlet && <span>{source.outlet}</span>}
+                      {source.outlet && source.published_at && <span> · </span>}
+                      {source.published_at && <span>{formatDate(source.published_at)}</span>}
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       )}
 
 
@@ -352,25 +359,26 @@ export function FindingDetail() {
                 <span className="text-gray-600"> · {user.email}</span>
               )}
             </p>
-            <textarea
+            <Textarea
               placeholder="Escribe un comentario…"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={3}
               maxLength={2000}
               required
-              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+              className="bg-dark-700 border-dark-600 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 resize-none"
             />
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-600">{content.length}/2000</span>
-              <button
+              <Button
                 type="submit"
                 disabled={addComment.isPending || !content.trim()}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-white transition-colors"
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white"
+                size="sm"
               >
                 <Send className="w-3.5 h-3.5" />
                 {addComment.isPending ? 'Enviando…' : 'Publicar'}
-              </button>
+              </Button>
             </div>
             {addComment.isError && (
               <p className="text-xs text-red-400">Error al publicar. Intenta de nuevo.</p>
@@ -379,13 +387,14 @@ export function FindingDetail() {
         ) : (
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-6 flex items-center justify-between gap-4">
             <p className="text-sm text-gray-400">Inicia sesión para comentar.</p>
-            <button
+            <Button
               onClick={openAuthModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors shrink-0"
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white shrink-0"
+              size="sm"
             >
               <LogIn className="w-4 h-4" />
               Iniciar sesión
-            </button>
+            </Button>
           </div>
         )}
 

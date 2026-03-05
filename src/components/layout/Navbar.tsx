@@ -1,8 +1,16 @@
 import { Link, NavLink } from 'react-router-dom';
-import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Menu, X, LogOut } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getInitials } from '../../lib/utils';
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
   { to: '/', label: 'Panel', icon: LayoutDashboard, exact: true },
@@ -13,18 +21,6 @@ const navLinks = [
 
 function UserMenu() {
   const { user, isLoading, signOut, openAuthModal } = useAuth();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
 
   if (isLoading) return null;
 
@@ -46,35 +42,34 @@ function UserMenu() {
     'Usuario';
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setDropdownOpen((v) => !v)}
-        className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xs font-bold text-blue-300 hover:bg-blue-500/30 transition-colors"
-        aria-label="Menú de usuario"
-      >
-        {getInitials(displayName)}
-      </button>
-      {dropdownOpen && (
-        <div className="absolute right-0 mt-2 w-52 bg-dark-800 border border-dark-600 rounded-xl shadow-2xl py-1 z-50">
-          <div className="px-3 py-2 border-b border-dark-600">
-            <p className="text-xs font-semibold text-white truncate">{displayName}</p>
-            <p className="text-xs text-gray-500 truncate">{user.email}</p>
-          </div>
-          <button
-            onClick={() => { signOut(); setDropdownOpen(false); }}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-dark-700 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar sesión
-          </button>
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xs font-bold text-blue-300 hover:bg-blue-500/30 transition-colors"
+          aria-label="Menú de usuario"
+        >
+          {getInitials(displayName)}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52 bg-dark-800 border-dark-600">
+        <DropdownMenuLabel className="font-normal py-2">
+          <p className="text-xs font-semibold text-white truncate">{displayName}</p>
+          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-dark-600" />
+        <DropdownMenuItem
+          onClick={signOut}
+          className="text-gray-400 hover:text-white focus:bg-dark-700 focus:text-white cursor-pointer gap-2"
+        >
+          <LogOut className="w-4 h-4" />
+          Cerrar sesión
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 export function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { user, isLoading, openAuthModal, signOut } = useAuth();
 
   return (
@@ -118,60 +113,63 @@ export function Navbar() {
             <div className="hidden sm:block">
               <UserMenu />
             </div>
-            <button
-              className="sm:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-dark-700 transition-colors"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <button
+                  className="sm:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-dark-700 transition-colors"
+                  aria-label="Toggle menu"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="right" className="bg-dark-900 border-dark-700 w-64 p-0">
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center gap-2.5 p-4 border-b border-dark-700">
+                    <div className="w-7 h-7 bg-red-500/20 border border-red-500/40 rounded-lg flex items-center justify-center">
+                      <Scale className="w-3.5 h-3.5 text-red-400" />
+                    </div>
+                    <span className="font-bold text-sm">PTY<span className="text-red-400">Corrupción</span></span>
+                  </div>
+                  <nav className="flex flex-col gap-1 p-3 flex-1">
+                    {navLinks.map(({ to, label, icon: Icon, exact }) => (
+                      <NavLink key={to} to={to} end={exact}
+                        className={({ isActive }) =>
+                          `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            isActive ? 'bg-dark-600 text-white' : 'text-gray-400 hover:text-white hover:bg-dark-700'
+                          }`
+                        }
+                      >
+                        <Icon className="w-4 h-4" />
+                        {label}
+                      </NavLink>
+                    ))}
+                  </nav>
+                  {/* Auth item */}
+                  <div className="p-3 border-t border-dark-700">
+                    {!isLoading && (
+                      user ? (
+                        <button
+                          onClick={signOut}
+                          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-dark-700 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Cerrar sesión
+                        </button>
+                      ) : (
+                        <button
+                          onClick={openAuthModal}
+                          className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors"
+                        >
+                          Iniciar sesión
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <div className="sm:hidden py-2 pb-3 border-t border-dark-600 mt-1">
-            {navLinks.map(({ to, label, icon: Icon, exact }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={exact}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-dark-600 text-white'
-                      : 'text-gray-400 hover:text-white hover:bg-dark-700'
-                  }`
-                }
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </NavLink>
-            ))}
-            {/* Auth item */}
-            <div className="mt-2 pt-2 border-t border-dark-700">
-              {!isLoading && (
-                user ? (
-                  <button
-                    onClick={() => { signOut(); setMobileOpen(false); }}
-                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-dark-700 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Cerrar sesión
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => { openAuthModal(); setMobileOpen(false); }}
-                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors"
-                  >
-                    Iniciar sesión
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </nav>
   );

@@ -11,6 +11,7 @@ import { NotFound } from './pages/NotFound';
 import { CorruptionIndex } from './pages/CorruptionIndex';
 import { Estadisticas } from './pages/Estadisticas';
 import { Analytics } from "@vercel/analytics/react"
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,20 +33,22 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <div className="min-h-screen bg-dark-950 text-white">
-            <Analytics />
-            <Navbar />
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/hallazgos" element={<Findings />} />
-              <Route path="/hallazgos/:id" element={<FindingDetail />} />
-              <Route path="/personas/:id" element={<PersonDetail />} />
-              <Route path="/indice" element={<CorruptionIndex />} />
-              <Route path="/estadisticas" element={<Estadisticas />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-          <AuthModalWrapper />
+          <TooltipProvider delayDuration={200}>
+            <div className="min-h-screen bg-dark-950 text-white">
+              <Analytics />
+              <Navbar />
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/hallazgos" element={<Findings />} />
+                <Route path="/hallazgos/:id" element={<FindingDetail />} />
+                <Route path="/personas/:id" element={<PersonDetail />} />
+                <Route path="/indice" element={<CorruptionIndex />} />
+                <Route path="/estadisticas" element={<Estadisticas />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+            <AuthModalWrapper />
+          </TooltipProvider>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

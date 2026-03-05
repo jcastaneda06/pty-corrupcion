@@ -1,4 +1,4 @@
-import { formatMoney } from '../../lib/utils';
+import { formatMoney } from "@/lib/utils";
 
 interface Props {
   amount: number | null | undefined;

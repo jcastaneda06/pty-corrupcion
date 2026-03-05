@@ -1,5 +1,14 @@
 import { Search, X } from 'lucide-react';
 import { type FindingFilters, type Severity } from '../../types';
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const SEVERITIES: { value: Severity; label: string }[] = [
   { value: 'critico', label: 'Crítico' },
@@ -41,12 +50,12 @@ export function FindingFilters({ filters, onChange }: Props) {
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-        <input
+        <Input
           type="text"
           placeholder="Buscar hallazgos…"
           value={filters.search ?? ''}
           onChange={(e) => update({ search: e.target.value })}
-          className="w-full bg-dark-700 border border-dark-500 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+          className="bg-dark-700 border-dark-500 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 h-9 pl-9"
         />
       </div>
 
@@ -56,18 +65,22 @@ export function FindingFilters({ filters, onChange }: Props) {
           <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
             Severidad
           </label>
-          <select
-            value={filters.severity ?? ''}
-            onChange={(e) => update({ severity: e.target.value as Severity | '' })}
-            className="w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+          <Select
+            value={filters.severity || '__all__'}
+            onValueChange={(v) => update({ severity: v === '__all__' ? '' : v as Severity })}
           >
-            <option value="">Todas</option>
-            {SEVERITIES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="bg-dark-700 border-dark-500 text-white h-9 focus:ring-blue-500">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent className="bg-dark-800 border-dark-600 text-white">
+              <SelectItem value="__all__" className="focus:bg-dark-700 focus:text-white text-gray-300">Todas</SelectItem>
+              {SEVERITIES.map((s) => (
+                <SelectItem key={s.value} value={s.value} className="focus:bg-dark-700 focus:text-white text-gray-300">
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Category */}
@@ -75,18 +88,22 @@ export function FindingFilters({ filters, onChange }: Props) {
           <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
             Categoría
           </label>
-          <select
-            value={filters.category ?? ''}
-            onChange={(e) => update({ category: e.target.value })}
-            className="w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+          <Select
+            value={filters.category || '__all__'}
+            onValueChange={(v) => update({ category: v === '__all__' ? '' : v })}
           >
-            <option value="">Todas</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="bg-dark-700 border-dark-500 text-white h-9 focus:ring-blue-500">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent className="bg-dark-800 border-dark-600 text-white">
+              <SelectItem value="__all__" className="focus:bg-dark-700 focus:text-white text-gray-300">Todas</SelectItem>
+              {CATEGORIES.map((c) => (
+                <SelectItem key={c} value={c} className="focus:bg-dark-700 focus:text-white text-gray-300">
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Date From */}
@@ -94,11 +111,11 @@ export function FindingFilters({ filters, onChange }: Props) {
           <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
             Desde
           </label>
-          <input
+          <Input
             type="date"
             value={filters.dateFrom ?? ''}
             onChange={(e) => update({ dateFrom: e.target.value })}
-            className="w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors [color-scheme:dark]"
+            className="bg-dark-700 border-dark-500 text-white focus-visible:ring-blue-500 h-9 [color-scheme:dark]"
           />
         </div>
 
@@ -107,23 +124,25 @@ export function FindingFilters({ filters, onChange }: Props) {
           <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
             Hasta
           </label>
-          <input
+          <Input
             type="date"
             value={filters.dateTo ?? ''}
             onChange={(e) => update({ dateTo: e.target.value })}
-            className="w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors [color-scheme:dark]"
+            className="bg-dark-700 border-dark-500 text-white focus-visible:ring-blue-500 h-9 [color-scheme:dark]"
           />
         </div>
       </div>
 
       {hasActiveFilters && (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={clear}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors h-auto p-0"
         >
           <X className="w-3.5 h-3.5" />
           Limpiar filtros
-        </button>
+        </Button>
       )}
     </div>
   );

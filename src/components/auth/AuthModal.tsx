@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 const ERROR_MAP: Record<string, string> = {
   'Invalid login credentials': 'Email o contraseña incorrectos.',
@@ -50,22 +53,13 @@ export function AuthModal() {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) closeAuthModal(); }}
-    >
-      <div className="bg-dark-900 border border-dark-600 rounded-2xl p-6 w-full max-w-sm relative shadow-2xl">
-        <button
-          onClick={closeAuthModal}
-          className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
-          aria-label="Cerrar"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <h2 className="text-lg font-bold text-white mb-5">
-          {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
-        </h2>
+    <Dialog open={true} onOpenChange={(v) => { if (!v) closeAuthModal(); }}>
+      <DialogContent className="bg-dark-900 border-dark-600 max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white text-lg">
+            {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+          </DialogTitle>
+        </DialogHeader>
 
         {signedUp ? (
           <div className="text-center py-6">
@@ -95,31 +89,39 @@ export function AuthModal() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3">
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-              <input
-                type="password"
-                placeholder="Contraseña"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-              />
+              <div className="space-y-1">
+                <Label htmlFor="auth-email" className="sr-only">Email</Label>
+                <Input
+                  id="auth-email"
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-dark-700 border-dark-600 text-white placeholder:text-gray-500 focus-visible:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="auth-password" className="sr-only">Contraseña</Label>
+                <Input
+                  id="auth-password"
+                  type="password"
+                  placeholder="Contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="bg-dark-700 border-dark-600 text-white placeholder:text-gray-500 focus-visible:ring-blue-500"
+                />
+              </div>
               {errorMsg && <p className="text-xs text-red-400">{errorMsg}</p>}
-              <button
+              <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-white transition-colors"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white"
               >
                 {isLoading ? 'Cargando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
-              </button>
+              </Button>
             </form>
 
             <p className="text-center text-xs text-gray-500 mt-4">
@@ -133,7 +135,7 @@ export function AuthModal() {
             </p>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
