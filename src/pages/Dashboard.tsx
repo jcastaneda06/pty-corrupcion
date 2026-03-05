@@ -7,6 +7,7 @@ import { FindingFilters } from '../components/findings/FindingFilters';
 import { FindingCardSkeleton } from '../components/ui/Skeleton';
 import { formatMoney } from '../lib/utils';
 import { type FindingFilters as Filters } from '../types';
+import { Tooltip } from '../components/ui/Tooltip';
 
 export function Dashboard() {
   const { data: stats, isLoading, error } = useDashboardStats();
@@ -56,11 +57,17 @@ export function Dashboard() {
       <section className="bg-dark-800 border border-dark-700 rounded-xl px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <Stat label="Hallazgos" value={isLoading ? '…' : String(stats?.total_findings ?? 0)} color="text-white" />
         <div className="hidden sm:block w-px h-7 bg-dark-600" />
-        <Stat label="Comprometido" value={isLoading ? '…' : formatMoney(stats?.total_amount_usd ?? 0)} color="text-emerald-400" />
+        <Tooltip content={stats?.total_amount_usd ?? null}>
+          <Stat label="Comprometido" value={isLoading ? '…' : formatMoney(stats?.total_amount_usd ?? 0)} color="text-emerald-400" />
+        </Tooltip>
         <div className="hidden sm:block w-px h-7 bg-dark-600" />
-        <Stat label="Críticos" value={isLoading ? '…' : String(stats?.by_severity.critico ?? 0)} color="text-red-400" />
+        <Tooltip content={stats?.by_severity.critico ? String(stats?.by_severity.critico ?? 0) : null}>
+          <Stat label="Críticos" value={isLoading ? '…' : String(stats?.by_severity.critico ?? 0)} color="text-red-400" />
+        </Tooltip>
         <div className="hidden sm:block w-px h-7 bg-dark-600" />
-        <Stat label="En investigación" value={isLoading ? '…' : String(stats?.by_severity.medio ?? 0)} color="text-yellow-400" />
+        <Tooltip content={stats?.by_severity.medio ? String(stats?.by_severity.medio ?? 0) : null}>
+          <Stat label="En investigación" value={isLoading ? '…' : String(stats?.by_severity.medio ?? 0)} color="text-yellow-400" />
+        </Tooltip>
         <Link
           to="/estadisticas"
           className="ml-auto flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"

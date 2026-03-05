@@ -10,6 +10,7 @@ import { PersonDetail } from './pages/PersonDetail';
 import { NotFound } from './pages/NotFound';
 import { CorruptionIndex } from './pages/CorruptionIndex';
 import { Estadisticas } from './pages/Estadisticas';
+import { Analytics } from "@vercel/analytics/react"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,7 @@ export function App() {
       <AuthProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-dark-950 text-white">
+            <Analytics />
             <Navbar />
             <Routes>
               <Route path="/" element={<Dashboard />} />
