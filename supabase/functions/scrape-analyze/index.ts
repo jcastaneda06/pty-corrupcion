@@ -876,6 +876,22 @@ Deno.serve(async (req: Request) => {
       `Skipped ${queue.length - freshQueue.length} already-known articles — ${freshQueue.length} new articles to process`,
     );
 
+    if (freshQueue.length === 0) {
+      console.log("No new articles found — exiting early");
+      await supabase.from("scrape_log").insert({
+        sources_checked: SEARCH_QUERIES.length,
+        articles_found: 0,
+        findings_created: 0,
+        status: "partial",
+        error_message: null,
+        duration_ms: Date.now() - startTime,
+      });
+      return new Response(
+        JSON.stringify({ success: true, message: "No new articles", findings_created: 0 }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     // Step 4: pre-screen raw articles by title before clustering
     // (keeps the clustering prompt small — avoids its timeout)
     const relevantArticles = await preScreenArticles(geminiKey, freshQueue);
