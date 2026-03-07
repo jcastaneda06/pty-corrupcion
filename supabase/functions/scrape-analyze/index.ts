@@ -887,8 +887,8 @@ Deno.serve(async (req: Request) => {
     // Hard cap ensures the function always finishes. Run the cron more
     // frequently (e.g. every 4-6h) to cover more articles per day.
     const BATCH_SIZE = 5;
-    const TIME_BUDGET_MS = 110_000;
-    const MAX_GROUPS_PER_RUN = 25;
+    const TIME_BUDGET_MS = 380_000;
+    const MAX_GROUPS_PER_RUN = 200;
 
     const toProcess = groups.slice(0, MAX_GROUPS_PER_RUN);
     if (groups.length > MAX_GROUPS_PER_RUN) {
