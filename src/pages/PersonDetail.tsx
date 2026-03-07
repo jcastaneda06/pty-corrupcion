@@ -122,7 +122,7 @@ export function PersonDetail() {
               return (
                 <Link
                   key={fp.id}
-                  to={`/hallazgos/${finding.id}`}
+                  to={`/casos/${finding.id}`}
                   className="block px-4 py-3 sm:px-0 sm:bg-dark-800 sm:border sm:border-dark-600 sm:hover:border-dark-500 sm:rounded-xl sm:p-4 transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">

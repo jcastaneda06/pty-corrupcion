@@ -69,7 +69,7 @@ export function FindingDetail() {
       <main className="max-w-4xl mx-auto px-0 sm:px-6 lg:px-8 py-8">
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
           <p className="text-red-400 font-medium">Caso no encontrado</p>
-          <Link to="/hallazgos" className="text-blue-400 text-sm mt-2 inline-block hover:underline">
+          <Link to="/casos" className="text-blue-400 text-sm mt-2 inline-block hover:underline">
             ← Volver a casos
           </Link>
         </div>
@@ -130,7 +130,7 @@ export function FindingDetail() {
       {/* Back */}
       <div className="px-4 sm:px-0">
         <Link
-          to="/hallazgos"
+          to="/casos"
           className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

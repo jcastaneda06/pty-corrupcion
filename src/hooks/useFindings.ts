@@ -13,8 +13,13 @@ async function fetchFindings(filters: FindingFilters = {}): Promise<Finding[]> {
       ),
       sources(*),
       reactions(*)
-    `)
-    .order('date_reported', { ascending: filters.sort === 'date_asc' });
+    `);
+
+  if (filters.sort === 'date_asc') {
+    query = query.order('date_occurred', { ascending: true, nullsFirst: false });
+  } else {
+    query = query.order('date_occurred', { ascending: false, nullsFirst: false });
+  }
 
   if (filters.severity) {
     query = query.eq('severity', filters.severity);

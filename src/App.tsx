@@ -40,8 +40,8 @@ export function App() {
               <Navbar />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/hallazgos" element={<Findings />} />
-                <Route path="/hallazgos/:id" element={<FindingDetail />} />
+                <Route path="/casos" element={<Findings />} />
+                <Route path="/casos/:id" element={<FindingDetail />} />
                 <Route path="/personas/:id" element={<PersonDetail />} />
                 <Route path="/indice" element={<CorruptionIndex />} />
                 <Route path="/estadisticas" element={<Estadisticas />} />

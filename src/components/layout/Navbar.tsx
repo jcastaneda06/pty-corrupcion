@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,7 +15,7 @@ import {
 
 const navLinks = [
   { to: '/', label: 'Panel', icon: LayoutDashboard, exact: true },
-  { to: '/hallazgos', label: 'Casos', icon: FileText, exact: false },
+  { to: '/casos', label: 'Casos', icon: FileText, exact: false },
   { to: '/estadisticas', label: 'Estadísticas', icon: BarChart2, exact: false },
   { to: '/indice', label: 'Índice', icon: TrendingDown, exact: false },
 ];
@@ -71,6 +72,7 @@ function UserMenu() {
 
 export function Navbar() {
   const { user, isLoading, openAuthModal, signOut } = useAuth();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-dark-600 bg-dark-900/90 backdrop-blur-sm">
@@ -113,7 +115,7 @@ export function Navbar() {
             <div className="hidden sm:block">
               <UserMenu />
             </div>
-            <Sheet>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <button
                   className="sm:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-dark-700 transition-colors"
@@ -133,6 +135,7 @@ export function Navbar() {
                   <nav className="flex flex-col gap-1 p-3 flex-1">
                     {navLinks.map(({ to, label, icon: Icon, exact }) => (
                       <NavLink key={to} to={to} end={exact}
+                        onClick={() => setSheetOpen(false)}
                         className={({ isActive }) =>
                           `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                             isActive ? 'bg-dark-600 text-white' : 'text-gray-400 hover:text-white hover:bg-dark-700'

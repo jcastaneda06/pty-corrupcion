@@ -73,7 +73,7 @@ export function FindingCard({ finding }: Props) {
 
   return (
     <Link
-      to={`/hallazgos/${finding.id}`}
+      to={`/casos/${finding.id}`}
       className="group block md:h-full"
     >
       <div

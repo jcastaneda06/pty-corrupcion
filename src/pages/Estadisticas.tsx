@@ -420,7 +420,7 @@ export function Estadisticas() {
                     margin={{ top: 0, right: 16, bottom: 0, left: 8 }}
                     onClick={({ activePayload }) => {
                       const id = activePayload?.[0]?.payload?.id;
-                      if (id) navigate(`/hallazgos/${id}`);
+                      if (id) navigate(`/casos/${id}`);
                     }}
                   >
                     <XAxis
