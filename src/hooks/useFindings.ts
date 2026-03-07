@@ -14,7 +14,7 @@ async function fetchFindings(filters: FindingFilters = {}): Promise<Finding[]> {
       sources(*),
       reactions(*)
     `)
-    .order('date_reported', { ascending: false });
+    .order('date_reported', { ascending: filters.sort === 'date_asc' });
 
   if (filters.severity) {
     query = query.eq('severity', filters.severity);

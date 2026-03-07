@@ -14,23 +14,28 @@ export function Dashboard() {
   const { data: stats, isLoading, error } = useDashboardStats();
 
   const [filters, setFilters] = useState<Filters>({
-    severity: '', category: '', search: '', dateFrom: '', dateTo: '',
+    severity: '', category: '', search: '', dateFrom: '', dateTo: '', sort: '',
   });
 
-  const hasFilters = !!(filters.severity || filters.category || filters.search || filters.dateFrom || filters.dateTo);
+  const hasFilters = !!(filters.severity || filters.category || filters.search || filters.dateFrom || filters.dateTo || filters.sort);
 
   const displayFindings = useMemo(() => {
     const all = stats?.recent_findings ?? [];
-    if (!hasFilters) return all.slice(0, 12);
+    const filtered = hasFilters && (filters.severity || filters.category || filters.search || filters.dateFrom || filters.dateTo)
+      ? all.filter(f => {
+          if (filters.severity && f.severity !== filters.severity) return false;
+          if (filters.category && f.category !== filters.category) return false;
+          if (filters.search && !f.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+          if (filters.dateFrom && (f.date_reported ?? '') < filters.dateFrom) return false;
+          if (filters.dateTo && (f.date_reported ?? '') > filters.dateTo) return false;
+          return true;
+        })
+      : all.slice(0, 12);
 
-    return all.filter(f => {
-      if (filters.severity && f.severity !== filters.severity) return false;
-      if (filters.category && f.category !== filters.category) return false;
-      if (filters.search && !f.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
-      if (filters.dateFrom && (f.date_reported ?? '') < filters.dateFrom) return false;
-      if (filters.dateTo && (f.date_reported ?? '') > filters.dateTo) return false;
-      return true;
-    });
+    if (filters.sort === 'date_asc') {
+      return [...filtered].sort((a, b) => (a.date_reported ?? '').localeCompare(b.date_reported ?? ''));
+    }
+    return filtered;
   }, [stats?.recent_findings, filters, hasFilters]);
 
   console.log(stats?.total_amount_usd);

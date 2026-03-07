@@ -349,7 +349,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta (sin 
 {
   "is_corruption_related": boolean,
   "title": "título conciso del caso (máx 100 chars)",
-  "summary": "Redacta la nota periodística completa como si fueras el reportero. Incluye todos los hechos, nombres, cargos, montos, fechas, instituciones, declaraciones y consecuencias mencionadas en el contenido. Escribe en tercera persona, estilo periodístico directo, sin introducir la nota con frases como 'Este artículo trata sobre…' o 'La noticia describe…'. Mínimo 3 párrafos.",
+  "summary": "Redacta la nota periodística completa como si fueras el reportero. Incluye todos los hechos, nombres, cargos, montos, fechas, instituciones, declaraciones y consecuencias mencionadas en el contenido. Escribe en tercera persona, estilo periodístico directo, sin introducir la nota con frases como 'Este artículo trata sobre…' o 'La noticia describe…'. Mínimo 2 párrafos.",
   "severity": "critico" | "alto" | "medio" | "bajo",
   "category": "Fraude en Contratación Pública" | "Peculado / Malversación" | "Lavado de Dinero" | "Soborno / Cohecho" | "Tráfico de Influencias" | "Captura del Estado" | "Abuso en Emergencias" | "Corrupción en Seguridad" | "Negligencia y Abuso Institucional" | "Violación de Derechos Humanos",
   "amount_usd": number | null,
@@ -887,7 +887,11 @@ Deno.serve(async (req: Request) => {
         duration_ms: Date.now() - startTime,
       });
       return new Response(
-        JSON.stringify({ success: true, message: "No new articles", findings_created: 0 }),
+        JSON.stringify({
+          success: true,
+          message: "No new articles",
+          findings_created: 0,
+        }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }

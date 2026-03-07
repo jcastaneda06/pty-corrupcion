@@ -16,6 +16,7 @@ export function Findings() {
     search: searchParams.get('search') || '',
     dateFrom: searchParams.get('dateFrom') || '',
     dateTo: searchParams.get('dateTo') || '',
+    sort: (searchParams.get('sort') as 'date_asc') || '',
   });
 
   // Sync filters → URL params
@@ -26,6 +27,7 @@ export function Findings() {
     if (filters.search) params.search = filters.search;
     if (filters.dateFrom) params.dateFrom = filters.dateFrom;
     if (filters.dateTo) params.dateTo = filters.dateTo;
+    if (filters.sort) params.sort = filters.sort;
     setSearchParams(params, { replace: true });
   }, [filters, setSearchParams]);
 

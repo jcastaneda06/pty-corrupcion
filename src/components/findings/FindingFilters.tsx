@@ -57,13 +57,13 @@ export function FindingFilters({ filters, onChange }: Props) {
   const [open, setOpen] = useState(false);
 
   const hasActiveFilters =
-    filters.severity || filters.category || filters.search || filters.dateFrom || filters.dateTo;
+    filters.severity || filters.category || filters.search || filters.dateFrom || filters.dateTo || filters.sort;
 
   const update = (partial: Partial<FindingFilters>) =>
     onChange({ ...filters, ...partial });
 
   const clear = () =>
-    onChange({ severity: '', category: '', search: '', dateFrom: '', dateTo: '' });
+    onChange({ severity: '', category: '', search: '', dateFrom: '', dateTo: '', sort: '' });
 
   // Build DateRange from filter strings
   const dateRange: DateRange | undefined =
@@ -103,7 +103,7 @@ export function FindingFilters({ filters, onChange }: Props) {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Severity */}
         <div>
           <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
@@ -146,6 +146,25 @@ export function FindingFilters({ filters, onChange }: Props) {
                   {c}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Sort */}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
+            Orden
+          </label>
+          <Select
+            value={filters.sort || 'date_desc'}
+            onValueChange={(v) => update({ sort: v === 'date_desc' ? '' : v as 'date_asc' })}
+          >
+            <SelectTrigger className="bg-dark-700 border-dark-500 text-white h-9 focus:ring-blue-500">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-dark-800 border-dark-600 text-white">
+              <SelectItem value="date_desc" className="focus:bg-dark-700 focus:text-white text-gray-300">Más reciente</SelectItem>
+              <SelectItem value="date_asc" className="focus:bg-dark-700 focus:text-white text-gray-300">Más antiguo</SelectItem>
             </SelectContent>
           </Select>
         </div>

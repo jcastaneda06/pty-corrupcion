@@ -114,4 +114,5 @@ export interface FindingFilters {
   search?: string;
   dateFrom?: string;
   dateTo?: string;
+  sort?: 'date_desc' | 'date_asc' | '';
 }
