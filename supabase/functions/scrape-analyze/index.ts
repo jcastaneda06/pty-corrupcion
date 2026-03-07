@@ -9,7 +9,7 @@
  * Secret:  supabase secrets set GEMINI_API_KEY=AIza...
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ── Search queries ────────────────────────────────────────────────────────────
 // Each query is sent to both Google News and Bing News RSS, giving two independent
@@ -18,52 +18,128 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SEARCH_QUERIES = [
   // Social / human rights (prioritized — processed first before timeout)
-  'SENNIAF panama',
-  'abuso menores hogares panama',
-  'negligencia hospital panama',
-  'CSS panama corrupcion',
-  'MINSA panama irregularidades',
-  'presos hacinamiento panama carcel',
-  'abuso policial panama',
-  'migrantes derechos humanos panama',
-  'adultos mayores abandono panama',
-  'hogar ninos panama muerte',
+  "SENNIAF panama",
+  "abuso menores hogares panama",
+  "negligencia hospital panama",
+  "CSS panama corrupcion",
+  "MINSA panama irregularidades",
+  "presos hacinamiento panama carcel",
+  "abuso policial panama",
+  "migrantes derechos humanos panama",
+  "adultos mayores abandono panama",
+  "hogar ninos panama muerte",
+  "protestas en panama",
+  "muerte de manifestantes panama",
+  "abuso policial panama",
+  "violacion de derechos humanos panama",
+  "MEDUCA panama corrupcion",
+  "racismo panama",
+  "discriminacion panama",
+  "homofobia panama",
+  "transfobia panama",
+  "discriminacion racial panama",
+  "discriminacion sexual panama",
+  "discriminacion de género panama",
+  "discriminacion de orientación sexual panama",
+  "discriminacion de identidad de género panama",
+  "discriminacion de expresión panama",
+  "discriminacion de religión panama",
 
   // Financial corruption
-  'corrupcion panama',
-  'peculado panama',
-  'soborno funcionario panama',
-  'malversacion fondos publicos panama',
-  'lavado dinero panama',
-  'fiscalia anticorrupcion panama',
-  'contraloria panama irregularidades',
-  'licitacion irregular panama',
-  'contratos publicos panama fraude',
-  'trafico influencias panama',
-  'enriquecimiento ilicito panama',
-  'desfalco panama',
+  "corrupcion panama",
+  "peculado panama",
+  "soborno funcionario panama",
+  "malversacion fondos publicos panama",
+  "lavado dinero panama",
+  "fiscalia anticorrupcion panama",
+  "contraloria panama irregularidades",
+  "licitacion irregular panama",
+  "contratos publicos panama fraude",
+  "trafico influencias panama",
+  "enriquecimiento ilicito panama",
+  "desfalco panama",
+  "fraude en contratacion panama",
+  "electricidad panama fraude",
+  "electricidad panama soborno",
+  "electricidad panama malversacion",
+  "electricidad panama lavado de dinero",
+  "electricidad panama fraude en contratacion",
+  "electricidad panama soborno",
+  "electricidad panama malversacion",
+  "electricidad panama lavado de dinero",
+  "telefonia panama fraude",
+  "telefonia panama soborno",
+  "telefonia panama malversacion",
+  "telefonia panama lavado de dinero",
+  "telefonia panama fraude en contratacion",
+  "telefonia panama soborno",
+  "telefonia panama malversacion",
+  "telefonia panama lavado de dinero",
+  "mas movil panama estafa",
+  "tigo panama estafa",
 
   // Government & political
-  'funcionario imputado panama',
-  'MOP panama contrato',
-  'asamblea nacional panama escandalo',
-  'juicio corrupcion panama',
-  'ministro detenido panama',
-  'alcalde panama corrupcion',
-  'diputado panama investigado',
+  "funcionario imputado panama",
+  "MOP panama contrato",
+  "asamblea nacional panama escandalo",
+  "juicio corrupcion panama",
+  "ministro detenido panama",
+  "alcalde panama corrupcion",
+  "diputado panama investigado",
+  "presidente panama corrupcion",
+  "vicepresidente panama corrupcion",
+  "ministro panama corrupcion",
+  "alcalde panama corrupcion",
+  "expresidente panama corrupcion",
+  "exvicepresidente panama corrupcion",
+  "exministro panama corrupcion",
+  "exalcalde panama corrupcion",
+  "exdiputado panama corrupcion",
+  "exfuncionario panama corrupcion",
+  "expresidente panama corrupcion",
+  "exvicepresidente panama corrupcion",
+  "exministro panama corrupcion",
+  "exalcalde panama corrupcion",
 
   // Environment & extractive
-  'mineria ilegal panama',
-  'tala ilegal panama funcionarios',
-  'concesion irregular panama',
+  "mineria ilegal panama",
+  "tala ilegal panama funcionarios",
+  "concesion irregular panama",
+  "corrupcion canal de panama",
 
   // English queries (picks up InSight Crime, Newsroom Panama, international press)
-  'Panama corruption scandal',
-  'Panama government officials arrested',
-  'Panama human rights violations',
-  'Panama public funds misuse',
-  'Panama bribery indictment',
-  'Panama social services abuse',
+  "Panama corruption scandal",
+  "Panama government officials arrested",
+  "Panama human rights violations",
+  "Panama public funds misuse",
+  "Panama bribery indictment",
+  "Panama social services abuse",
+  "Panama corruption in construction",
+  "Panama corruption in public procurement",
+  "Panama corruption in public services",
+  "Panama corruption in public transport",
+  "Panama corruption in public health",
+  "Panama corruption in public education",
+  "Panama corruption in public security",
+  "Panama corruption in public environment",
+  "Panama corruption in public justice",
+  "Panama corruption in public finance",
+  "Panama corruption in public administration",
+  "Panama corruption in public international relations",
+  "Panama corruption in public international cooperation",
+  "Panama corruption in public international trade",
+  "Panama corruption in public international law",
+  "Panama corruption in public international organization",
+  "Panama corruption in public international treaty",
+  "Panama corruption in public international agreement",
+  "Panama corruption in public international convention",
+  "Panama corruption in public international protocol",
+  "Panama corruption in public international resolution",
+  "Panama corruption in public international declaration",
+  "Panama corruption in public international resolution",
+  "Panama corruption in public international declaration",
+  "Panama corruption in public international resolution",
+  "Panama corruption in public international declaration",
 ];
 
 // ── RSS feed URL builders + Bing redirect resolver ────────────────────────────
@@ -78,14 +154,18 @@ function googleNewsRssUrl(query: string): string {
 async function verifyUrl(url: string): Promise<boolean> {
   try {
     let response = await fetch(url, {
-      method: 'HEAD',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)' },
+      method: "HEAD",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)",
+      },
       signal: AbortSignal.timeout(4_000),
     });
     if (response.status === 405) {
       response = await fetch(url, {
-        method: 'GET',
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)' },
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)",
+        },
         signal: AbortSignal.timeout(4_000),
       });
     }
@@ -114,19 +194,19 @@ interface RssItem {
 }
 
 function extractCdata(xml: string): string {
-  return xml.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/, '$1').trim();
+  return xml.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/, "$1").trim();
 }
 
 function stripHtml(html: string): string {
   return html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#\d+;/g, '')
-    .replace(/\s+/g, ' ')
+    .replace(/&#\d+;/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -134,8 +214,8 @@ async function fetchRssItems(feedUrl: string): Promise<RssItem[]> {
   try {
     const response = await fetch(feedUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        "User-Agent": "Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)",
+        Accept: "application/rss+xml, application/xml, text/xml, */*",
       },
       signal: AbortSignal.timeout(10_000),
     });
@@ -149,25 +229,32 @@ async function fetchRssItems(feedUrl: string): Promise<RssItem[]> {
     while ((itemMatch = itemPattern.exec(xml)) !== null) {
       const chunk = itemMatch[1];
 
-      const titleRaw = chunk.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '';
+      const titleRaw =
+        chunk.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
       const title = stripHtml(extractCdata(titleRaw));
 
       const linkRaw =
         chunk.match(/<link[^>]*>([\s\S]*?)<\/link>/i)?.[1] ??
-        chunk.match(/<guid[^>]*isPermaLink="true"[^>]*>([\s\S]*?)<\/guid>/i)?.[1] ??
-        '';
+        chunk.match(
+          /<guid[^>]*isPermaLink="true"[^>]*>([\s\S]*?)<\/guid>/i,
+        )?.[1] ??
+        "";
       const url = extractCdata(linkRaw).trim();
 
-      const descRaw = chunk.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] ?? '';
+      const descRaw =
+        chunk.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] ?? "";
       const description = stripHtml(extractCdata(descRaw));
 
       // <source> tag gives us the outlet name (Google News and Bing both include it)
-      const outletRaw = chunk.match(/<source[^>]*>([\s\S]*?)<\/source>/i)?.[1] ?? '';
-      const outlet = stripHtml(extractCdata(outletRaw)) || 'Desconocido';
+      const outletRaw =
+        chunk.match(/<source[^>]*>([\s\S]*?)<\/source>/i)?.[1] ?? "";
+      const outlet = stripHtml(extractCdata(outletRaw)) || "Desconocido";
 
-      const pubDate = chunk.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i)?.[1]?.trim() ?? null;
+      const pubDate =
+        chunk.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i)?.[1]?.trim() ??
+        null;
 
-      if (!url || url.startsWith('#')) continue;
+      if (!url || url.startsWith("#")) continue;
       items.push({ url, title, description, outlet, pubDate });
     }
 
@@ -180,12 +267,12 @@ async function fetchRssItems(feedUrl: string): Promise<RssItem[]> {
 // ── HTML: fetch full article content ─────────────────────────────────────────
 
 async function fetchArticleContent(url: string): Promise<ArticleContent> {
-  const empty: ArticleContent = { title: '', description: '', body: '' };
+  const empty: ArticleContent = { title: "", description: "", body: "" };
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)',
-        'Accept': 'text/html,application/xhtml+xml',
+        "User-Agent": "Mozilla/5.0 (compatible; PTYCorruptionBot/1.0)",
+        Accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(10_000),
     });
@@ -193,17 +280,21 @@ async function fetchArticleContent(url: string): Promise<ArticleContent> {
     const html = await response.text();
 
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : '';
+    const title = titleMatch ? titleMatch[1].trim() : "";
 
     const descMatch =
-      html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
-      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
-    const description = descMatch ? descMatch[1].trim() : '';
+      html.match(
+        /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
+      ) ||
+      html.match(
+        /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i,
+      );
+    const description = descMatch ? descMatch[1].trim() : "";
 
     const body = stripHtml(
       html
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " "),
     );
 
     return { title, description, body };
@@ -234,15 +325,18 @@ async function resolveRssContent(item: RssItem): Promise<ArticleContent> {
 
 // ── Claude prompt ─────────────────────────────────────────────────────────────
 
-function buildExtractionPrompt(content: ArticleContent, sourceUrl: string): string {
+function buildExtractionPrompt(
+  content: ArticleContent,
+  sourceUrl: string,
+): string {
   const contextBlock = [
-    content.title ? `TÍTULO: ${content.title}` : '',
-    content.description ? `DESCRIPCIÓN: ${content.description}` : '',
+    content.title ? `TÍTULO: ${content.title}` : "",
+    content.description ? `DESCRIPCIÓN: ${content.description}` : "",
   ]
     .filter(Boolean)
-    .join('\n');
+    .join("\n");
 
-  return `Eres un analista experto en corrupción, finanzas públicas y gobierno en Panamá. Analiza el siguiente contenido y determina si está relacionado con fondos públicos, funcionarios del gobierno, contratos, adquisiciones, o cualquier conducta irregular en el sector público.
+  return `Eres un analista experto en corrupción, finanzas públicas y gobierno en Panamá. Analiza el siguiente contenido y determina si está relacionado con fondos públicos, funcionarios del gobierno, contratos, adquisiciones, o cualquier conducta irregular en el sector público o privado en Panamá.
 
 FUENTE:
 URL: ${sourceUrl}
@@ -255,7 +349,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta (sin 
 {
   "is_corruption_related": boolean,
   "title": "título conciso del caso (máx 100 chars)",
-  "summary": "resumen factual de 2-4 oraciones del caso",
+  "summary": "resumen factual y extensivo del caso con nombre de implicados, si hay. Escribe una nota completa basado en todo el contenido que tienes a disposición.",
   "severity": "critico" | "alto" | "medio" | "bajo",
   "category": "Fraude en Contratación Pública" | "Peculado / Malversación" | "Lavado de Dinero" | "Soborno / Cohecho" | "Tráfico de Influencias" | "Captura del Estado" | "Abuso en Emergencias" | "Corrupción en Seguridad" | "Negligencia y Abuso Institucional" | "Violación de Derechos Humanos",
   "amount_usd": number | null,
@@ -314,13 +408,13 @@ Extrae TODAS las personas mencionadas y sus relaciones aunque el documento no se
 // already stored in the sources table without touching Gemini at all.
 
 async function loadKnownUrls(
-  supabase: ReturnType<typeof createClient>
+  supabase: ReturnType<typeof createClient>,
 ): Promise<Set<string>> {
   const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
   const { data } = await supabase
-    .from('sources')
-    .select('url')
-    .gte('created_at', cutoff);
+    .from("sources")
+    .select("url")
+    .gte("created_at", cutoff);
   return new Set(data?.map((s: { url: string }) => s.url) ?? []);
 }
 
@@ -329,20 +423,20 @@ async function loadKnownUrls(
 async function isDuplicate(
   supabase: ReturnType<typeof createClient>,
   title: string,
-  urls: string[]
+  urls: string[],
 ): Promise<boolean> {
   const { data: byUrl } = await supabase
-    .from('sources')
-    .select('id')
-    .in('url', urls)
+    .from("sources")
+    .select("id")
+    .in("url", urls)
     .limit(1);
   if (byUrl && byUrl.length > 0) return true;
 
   const titleStart = title.slice(0, 60);
   const { data: byTitle } = await supabase
-    .from('findings')
-    .select('id')
-    .ilike('title', `${titleStart}%`)
+    .from("findings")
+    .select("id")
+    .ilike("title", `${titleStart}%`)
     .limit(1);
   return !!(byTitle && byTitle.length > 0);
 }
@@ -353,13 +447,16 @@ async function isDuplicate(
 
 async function clusterItemsIntoGroups(
   apiKey: string,
-  items: RssItem[]
+  items: RssItem[],
 ): Promise<RssItem[][]> {
-  if (items.length <= 1) return items.map(item => [item]);
+  if (items.length <= 1) return items.map((item) => [item]);
 
   const itemList = items
-    .map((item, i) => `[${i}] ${item.title}${item.description ? ' — ' + item.description.slice(0, 120) : ''}`)
-    .join('\n');
+    .map(
+      (item, i) =>
+        `[${i}] ${item.title}${item.description ? " — " + item.description.slice(0, 120) : ""}`,
+    )
+    .join("\n");
 
   try {
     const clusterPrompt = `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
@@ -373,27 +470,35 @@ Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`;
     const text = await callGemini(apiKey, clusterPrompt, 30_000);
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON object in clustering response');
+    if (!jsonMatch) throw new Error("No JSON object in clustering response");
     const { groups } = JSON.parse(jsonMatch[0]) as { groups: number[][] };
 
     const seen = new Set<number>();
     const result: RssItem[][] = [];
     for (const group of groups) {
-      const valid = group.filter(i => Number.isInteger(i) && i >= 0 && i < items.length && !seen.has(i));
-      valid.forEach(i => seen.add(i));
-      if (valid.length > 0) result.push(valid.map(i => items[i]));
+      const valid = group.filter(
+        (i) =>
+          Number.isInteger(i) && i >= 0 && i < items.length && !seen.has(i),
+      );
+      valid.forEach((i) => seen.add(i));
+      if (valid.length > 0) result.push(valid.map((i) => items[i]));
     }
     // Append any items Gemini missed
     for (let i = 0; i < items.length; i++) {
       if (!seen.has(i)) result.push([items[i]]);
     }
 
-    const grouped = result.filter(g => g.length > 1).length;
-    console.log(`Clustered ${items.length} articles into ${result.length} groups (${grouped} multi-article groups)`);
+    const grouped = result.filter((g) => g.length > 1).length;
+    console.log(
+      `Clustered ${items.length} articles into ${result.length} groups (${grouped} multi-article groups)`,
+    );
     return result;
   } catch (e) {
-    console.warn('Gemini clustering failed, treating each item independently:', e);
-    return items.map(item => [item]);
+    console.warn(
+      "Gemini clustering failed, treating each item independently:",
+      e,
+    );
+    return items.map((item) => [item]);
   }
 }
 
@@ -404,10 +509,13 @@ Todo índice del 0 al ${items.length - 1} debe aparecer exactamente una vez.`;
 
 function resolveGroupContent(group: RssItem[]): ArticleContent {
   const title = group[0].title;
-  const description = group.find(i => i.description)?.description ?? '';
+  const description = group.find((i) => i.description)?.description ?? "";
   const body = group
-    .map(item => `${item.outlet}: ${item.title}${item.description ? '\n' + item.description : ''}`)
-    .join('\n\n')
+    .map(
+      (item) =>
+        `${item.outlet}: ${item.title}${item.description ? "\n" + item.description : ""}`,
+    )
+    .join("\n\n")
     .slice(0, 3000);
   return { title, description, body };
 }
@@ -418,19 +526,19 @@ async function upsertPerson(
   supabase: ReturnType<typeof createClient>,
   name: string,
   role: string | null,
-  isPublicFigure: boolean
+  isPublicFigure: boolean,
 ): Promise<string> {
   const { data: existing } = await supabase
-    .from('people')
-    .select('id')
-    .ilike('name', name)
+    .from("people")
+    .select("id")
+    .ilike("name", name)
     .limit(1);
   if (existing && existing.length > 0) return existing[0].id;
 
   const { data, error } = await supabase
-    .from('people')
+    .from("people")
     .insert({ name, role, is_public_figure: isPublicFigure })
-    .select('id')
+    .select("id")
     .single();
   if (error) throw new Error(`Failed to insert person: ${error.message}`);
   return data.id;
@@ -438,27 +546,37 @@ async function upsertPerson(
 
 // ── Gemini REST call with one retry on 429 ───────────────────────────────────
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-async function callGemini(apiKey: string, prompt: string, timeoutMs = 55_000): Promise<string> {
+async function callGemini(
+  apiKey: string,
+  prompt: string,
+  timeoutMs = 55_000,
+): Promise<string> {
   const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { "Content-Type": "application/json" };
 
   let res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST', headers, body,
+    method: "POST",
+    headers,
+    body,
     signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (res.status === 429) {
-    console.warn('Rate limited — retrying in 6s');
-    await new Promise(r => setTimeout(r, 6000));
+    console.warn("Rate limited — retrying in 6s");
+    await new Promise((r) => setTimeout(r, 6000));
     res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: 'POST', headers, body,
+      method: "POST",
+      headers,
+      body,
       signal: AbortSignal.timeout(timeoutMs),
     });
   }
 
-  if (!res.ok) throw new Error(`Gemini API error: ${res.status} ${await res.text()}`);
+  if (!res.ok)
+    throw new Error(`Gemini API error: ${res.status} ${await res.text()}`);
   const data = await res.json();
   return data.candidates[0].content.parts[0].text as string;
 }
@@ -471,15 +589,18 @@ async function processArticle(
   supabase: ReturnType<typeof createClient>,
   apiKey: string,
   items: RssItem[],
-  content: ArticleContent
+  content: ArticleContent,
 ): Promise<boolean> {
   const primaryItem = items[0];
 
   let extracted: Record<string, unknown>;
   try {
-    const rawText = await callGemini(apiKey, buildExtractionPrompt(content, primaryItem.url));
+    const rawText = await callGemini(
+      apiKey,
+      buildExtractionPrompt(content, primaryItem.url),
+    );
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON object in Gemini response');
+    if (!jsonMatch) throw new Error("No JSON object in Gemini response");
     extracted = JSON.parse(jsonMatch[0]);
   } catch (e) {
     console.error(`  Gemini/parse error for ${primaryItem.url}:`, e);
@@ -489,29 +610,34 @@ async function processArticle(
   if (!extracted.is_corruption_related) return false;
   if (!extracted.title || !extracted.summary) return false;
 
-  const dup = await isDuplicate(supabase, String(extracted.title), items.map(i => i.url));
+  const dup = await isDuplicate(
+    supabase,
+    String(extracted.title),
+    items.map((i) => i.url),
+  );
   if (dup) {
     console.log(`  Duplicate, skipping: ${extracted.title}`);
     return false;
   }
 
   // Verify all URLs in parallel; use first verified as the finding's primary URL
-  const verifiedFlags = await Promise.all(items.map(i => verifyUrl(i.url)));
-  const primaryVerifiedUrl = items.find((_, idx) => verifiedFlags[idx])?.url ?? null;
+  const verifiedFlags = await Promise.all(items.map((i) => verifyUrl(i.url)));
+  const primaryVerifiedUrl =
+    items.find((_, idx) => verifiedFlags[idx])?.url ?? null;
 
   const { data: finding, error: findingError } = await supabase
-    .from('findings')
+    .from("findings")
     .insert({
       title: String(extracted.title),
       summary: String(extracted.summary),
-      severity: extracted.severity ?? 'bajo',
-      category: extracted.category ?? 'Fraude en Contratación Pública',
+      severity: extracted.severity ?? "bajo",
+      category: extracted.category ?? "Fraude en Contratación Pública",
       amount_usd: extracted.amount_usd ?? null,
       date_occurred: extracted.date_occurred ?? null,
-      date_reported: new Date().toISOString().split('T')[0],
+      date_reported: new Date().toISOString().split("T")[0],
       source_url: primaryVerifiedUrl,
     })
-    .select('id')
+    .select("id")
     .single();
 
   if (findingError) {
@@ -525,10 +651,16 @@ async function processArticle(
   for (let idx = 0; idx < items.length; idx++) {
     if (!verifiedFlags[idx]) continue;
     const groupItem = items[idx];
-    const itemPubDate = groupItem.pubDate ? (() => {
-      try { return new Date(groupItem.pubDate!).toISOString().split('T')[0]; } catch { return null; }
-    })() : null;
-    await supabase.from('sources').insert({
+    const itemPubDate = groupItem.pubDate
+      ? (() => {
+          try {
+            return new Date(groupItem.pubDate!).toISOString().split("T")[0];
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+    await supabase.from("sources").insert({
       finding_id: findingId,
       url: groupItem.url,
       title: content.title || groupItem.title || null,
@@ -537,22 +669,28 @@ async function processArticle(
     });
   }
 
-  const people = (extracted.people as Array<{
-    name: string;
-    role?: string;
-    role_in_case?: string;
-    amount_usd?: number;
-    is_convicted?: boolean;
-    is_public_figure?: boolean;
-  }>) ?? [];
+  const people =
+    (extracted.people as Array<{
+      name: string;
+      role?: string;
+      role_in_case?: string;
+      amount_usd?: number;
+      is_convicted?: boolean;
+      is_public_figure?: boolean;
+    }>) ?? [];
   const personIdMap: Record<string, string> = {};
 
   for (const p of people) {
     if (!p.name) continue;
     try {
-      const personId = await upsertPerson(supabase, p.name, p.role ?? null, p.is_public_figure ?? false);
+      const personId = await upsertPerson(
+        supabase,
+        p.name,
+        p.role ?? null,
+        p.is_public_figure ?? false,
+      );
       personIdMap[p.name] = personId;
-      await supabase.from('finding_people').upsert(
+      await supabase.from("finding_people").upsert(
         {
           finding_id: findingId,
           person_id: personId,
@@ -560,29 +698,35 @@ async function processArticle(
           amount_usd: p.amount_usd ?? null,
           is_convicted: p.is_convicted ?? false,
         },
-        { onConflict: 'finding_id,person_id' }
+        { onConflict: "finding_id,person_id" },
       );
     } catch (e) {
       console.error(`  Error inserting person ${p.name}:`, e);
     }
   }
 
-  const rels = (extracted.relationships as Array<{
-    person_a: string;
-    person_b: string;
-    relationship: string;
-    description?: string;
-  }>) ?? [];
+  const rels =
+    (extracted.relationships as Array<{
+      person_a: string;
+      person_b: string;
+      relationship: string;
+      description?: string;
+    }>) ?? [];
 
   for (const rel of rels) {
     const aId = personIdMap[rel.person_a];
     const bId = personIdMap[rel.person_b];
     if (!aId || !bId) continue;
     await supabase
-      .from('person_relationships')
+      .from("person_relationships")
       .upsert(
-        { person_a_id: aId, person_b_id: bId, relationship: rel.relationship, description: rel.description ?? null },
-        { onConflict: 'person_a_id,person_b_id' }
+        {
+          person_a_id: aId,
+          person_b_id: bId,
+          relationship: rel.relationship,
+          description: rel.description ?? null,
+        },
+        { onConflict: "person_a_id,person_b_id" },
       )
       .then(() => {});
   }
@@ -599,13 +743,16 @@ async function processArticle(
 
 async function preScreenArticles(
   apiKey: string,
-  items: RssItem[]
+  items: RssItem[],
 ): Promise<RssItem[]> {
   if (items.length === 0) return [];
 
   const itemList = items
-    .map((item, i) => `[${i}] ${item.title}${item.description ? ' — ' + item.description.slice(0, 80) : ''}`)
-    .join('\n');
+    .map(
+      (item, i) =>
+        `[${i}] ${item.title}${item.description ? " — " + item.description.slice(0, 80) : ""}`,
+    )
+    .join("\n");
 
   try {
     const screenPrompt = `Eres un filtro de relevancia rápido. Analiza los siguientes titulares de artículos de noticias panameñas y devuelve SOLO los índices de artículos que probablemente cubran alguno de estos temas:
@@ -623,13 +770,17 @@ Excluye deportes, entretenimiento, accidentes de tráfico sin funcionarios impli
     const text = await callGemini(apiKey, screenPrompt, 30_000);
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON in pre-screen response');
+    if (!jsonMatch) throw new Error("No JSON in pre-screen response");
     const { relevant } = JSON.parse(jsonMatch[0]) as { relevant: number[] };
-    const valid = relevant.filter(i => Number.isInteger(i) && i >= 0 && i < items.length);
-    console.log(`Pre-screened: ${valid.length} of ${items.length} articles are relevant (${Math.round(valid.length / items.length * 100)}%)`);
-    return valid.map(i => items[i]);
+    const valid = relevant.filter(
+      (i) => Number.isInteger(i) && i >= 0 && i < items.length,
+    );
+    console.log(
+      `Pre-screened: ${valid.length} of ${items.length} articles are relevant (${Math.round((valid.length / items.length) * 100)}%)`,
+    );
+    return valid.map((i) => items[i]);
   } catch (e) {
-    console.warn('Pre-screening failed, processing all articles:', e);
+    console.warn("Pre-screening failed, processing all articles:", e);
     return items;
   }
 }
@@ -637,18 +788,21 @@ Excluye deportes, entretenimiento, accidentes de tráfico sin funcionarios impli
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+  if (req.method !== "GET" && req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const geminiKey = Deno.env.get("GEMINI_API_KEY")!;
 
   if (!geminiKey) {
     return new Response(
-      JSON.stringify({ error: 'GEMINI_API_KEY not set. Run: supabase secrets set GEMINI_API_KEY=AIza...' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error:
+          "GEMINI_API_KEY not set. Run: supabase secrets set GEMINI_API_KEY=AIza...",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 
@@ -661,13 +815,14 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Step 1: fetch all Google News RSS feeds in parallel (~36 requests at once, ~10s total)
-    const allFeeds = SEARCH_QUERIES.map(q => ({
-      feedUrl: googleNewsRssUrl(q), label: `google:${q}`,
+    const allFeeds = SEARCH_QUERIES.map((q) => ({
+      feedUrl: googleNewsRssUrl(q),
+      label: `google:${q}`,
     }));
 
     console.log(`Fetching ${allFeeds.length} RSS feeds in parallel…`);
     const feedResults = await Promise.all(
-      allFeeds.map(f => fetchRssItems(f.feedUrl))
+      allFeeds.map((f) => fetchRssItems(f.feedUrl)),
     );
     console.log(`RSS fetch complete. Deduplicating…`);
 
@@ -685,8 +840,10 @@ Deno.serve(async (req: Request) => {
 
     // Step 3: filter out articles already stored in the sources table
     const knownUrls = await loadKnownUrls(supabase);
-    const freshQueue = queue.filter(item => !knownUrls.has(item.url));
-    console.log(`Skipped ${queue.length - freshQueue.length} already-known articles — ${freshQueue.length} new articles to process`);
+    const freshQueue = queue.filter((item) => !knownUrls.has(item.url));
+    console.log(
+      `Skipped ${queue.length - freshQueue.length} already-known articles — ${freshQueue.length} new articles to process`,
+    );
 
     // Step 4: pre-screen raw articles by title before clustering
     // (keeps the clustering prompt small — avoids its timeout)
@@ -704,35 +861,43 @@ Deno.serve(async (req: Request) => {
 
     const toProcess = groups.slice(0, MAX_GROUPS_PER_RUN);
     if (groups.length > MAX_GROUPS_PER_RUN) {
-      console.log(`Capping at ${MAX_GROUPS_PER_RUN} of ${groups.length} groups this run`);
+      console.log(
+        `Capping at ${MAX_GROUPS_PER_RUN} of ${groups.length} groups this run`,
+      );
     }
 
     for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
       if (Date.now() - startTime > TIME_BUDGET_MS) {
-        console.log(`Time budget reached after ${i} of ${toProcess.length} groups — stopping early`);
+        console.log(
+          `Time budget reached after ${i} of ${toProcess.length} groups — stopping early`,
+        );
         break;
       }
       const batch = toProcess.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(batch.map(async (group) => {
-        articlesFound += group.length;
-        console.log(`  Processing group (${group.length} article${group.length > 1 ? 's' : ''}): ${group[0].title || group[0].url}`);
-        const content = resolveGroupContent(group);
-        return processArticle(supabase, geminiKey, group, content);
-      }));
+      const results = await Promise.all(
+        batch.map(async (group) => {
+          articlesFound += group.length;
+          console.log(
+            `  Processing group (${group.length} article${group.length > 1 ? "s" : ""}): ${group[0].title || group[0].url}`,
+          );
+          const content = resolveGroupContent(group);
+          return processArticle(supabase, geminiKey, group, content);
+        }),
+      );
       findingsCreated += results.filter(Boolean).length;
     }
   } catch (e) {
     lastError = e instanceof Error ? e.message : String(e);
-    console.error('Fatal error:', lastError);
+    console.error("Fatal error:", lastError);
   }
 
   const duration = Date.now() - startTime;
 
-  await supabase.from('scrape_log').insert({
+  await supabase.from("scrape_log").insert({
     sources_checked: SEARCH_QUERIES.length,
     articles_found: articlesFound,
     findings_created: findingsCreated,
-    status: lastError ? 'error' : findingsCreated > 0 ? 'success' : 'partial',
+    status: lastError ? "error" : findingsCreated > 0 ? "success" : "partial",
     error_message: lastError,
     duration_ms: duration,
   });
@@ -746,6 +911,6 @@ Deno.serve(async (req: Request) => {
       duration_ms: duration,
       error: lastError,
     }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
+    { status: 200, headers: { "Content-Type": "application/json" } },
   );
 });
