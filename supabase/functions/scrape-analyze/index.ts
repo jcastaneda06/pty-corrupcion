@@ -544,6 +544,25 @@ async function upsertPerson(
   return data.id;
 }
 
+// ── Panama timezone helpers ───────────────────────────────────────────────────
+// Panama is UTC-5 and does not observe DST.
+
+function todayInPanama(): string {
+  const panamaMs = Date.now() - 5 * 60 * 60 * 1000;
+  return new Date(panamaMs).toISOString().split("T")[0];
+}
+
+function pubDateToPanamaDate(pubDate: string): string | null {
+  try {
+    const d = new Date(pubDate);
+    if (isNaN(d.getTime())) return null;
+    const panamaMs = d.getTime() - 5 * 60 * 60 * 1000;
+    return new Date(panamaMs).toISOString().split("T")[0];
+  } catch {
+    return null;
+  }
+}
+
 // ── Gemini REST call with one retry on 429 ───────────────────────────────────
 
 const GEMINI_URL =
@@ -625,6 +644,17 @@ async function processArticle(
   const primaryVerifiedUrl =
     items.find((_, idx) => verifiedFlags[idx])?.url ?? null;
 
+  // Derive date_reported from the most recent article pubDate (Panama time, UTC-5),
+  // capped at today so future-dated UTC timestamps never appear as "tomorrow".
+  const todayPanama = todayInPanama();
+  const groupPanamaDates = items
+    .map((i) => (i.pubDate ? pubDateToPanamaDate(i.pubDate) : null))
+    .filter((d): d is string => d !== null && d <= todayPanama);
+  const dateReported =
+    groupPanamaDates.length > 0
+      ? groupPanamaDates.sort().at(-1)!
+      : todayPanama;
+
   const { data: finding, error: findingError } = await supabase
     .from("findings")
     .insert({
@@ -634,7 +664,7 @@ async function processArticle(
       category: extracted.category ?? "Fraude en Contratación Pública",
       amount_usd: extracted.amount_usd ?? null,
       date_occurred: extracted.date_occurred ?? null,
-      date_reported: new Date().toISOString().split("T")[0],
+      date_reported: dateReported,
       source_url: primaryVerifiedUrl,
     })
     .select("id")
