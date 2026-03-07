@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ResponsiveContainer,
@@ -7,12 +7,18 @@ import {
   PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
-import { BarChart2, ExternalLink } from 'lucide-react';
+import { BarChart2, ExternalLink, Clock, CalendarDays, Calendar } from 'lucide-react';
 import { useDashboardStats } from '../hooks/useFindings';
 import { SEVERITY_COLORS, SEVERITY_LABELS, CATEGORY_LABELS, formatMoney, truncate } from '../lib/utils';
 import { type Severity } from '../types';
 
 const SEVERITIES: Severity[] = ['critico', 'alto', 'medio', 'bajo'];
+
+// Panama cost benchmarks (USD) for equivalency comparisons
+const HOSPITAL_ONCOLOGICO = 65_000_000;  // ~$65M for a full oncological hospital
+const CASA_PROMEDIO       = 85_000;      // ~$85K average home
+const PLANTA_DE_AGUA      = 28_000_000;  // ~$28M water treatment plant
+const ESCUELA_PUBLICA     = 900_000;     // ~$900K public school
 
 const SOURCES = [
   {
@@ -47,6 +53,18 @@ const SOURCES = [
   },
 ];
 
+type TimeGranularity = 'hora' | 'dia' | 'mes';
+
+type Tab = 'temporal' | 'categorias' | 'severidad' | 'top10' | 'fuentes';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'temporal',   label: 'Casos en el tiempo' },
+  { id: 'categorias', label: 'Monto por categoría' },
+  { id: 'severidad',  label: 'Distribución severidad' },
+  { id: 'top10',      label: 'Top 10 por monto' },
+  { id: 'fuentes',    label: 'Fuentes' },
+];
+
 // ── Custom tooltips ────────────────────────────────────────────────────────────
 
 function AreaTip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
@@ -54,7 +72,7 @@ function AreaTip({ active, payload, label }: { active?: boolean; payload?: { val
   return (
     <div className="bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm">
       <p className="text-gray-400 text-xs mb-0.5">{label}</p>
-      <p className="text-white font-semibold">{payload[0].value} hallazgos</p>
+      <p className="text-white font-semibold">{payload[0].value} casos</p>
     </div>
   );
 }
@@ -79,13 +97,10 @@ function SeverityTip({ active, payload }: { active?: boolean; payload?: { name: 
   );
 }
 
-function TopTip({ active, payload }: { active?: boolean; payload?: { value: number }[] }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm">
-      <p className="text-emerald-400 font-semibold">{formatMoney(payload[0].value)}</p>
-    </div>
-  );
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function rawMoney(amount: number): string {
+  return '$' + Math.round(amount).toLocaleString('en-US');
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -93,24 +108,47 @@ function TopTip({ active, payload }: { active?: boolean; payload?: { value: numb
 export function Estadisticas() {
   const navigate = useNavigate();
   const { data: stats, isLoading } = useDashboardStats();
+  const [activeTab, setActiveTab] = useState<Tab>('temporal');
+  const [granularity, setGranularity] = useState<TimeGranularity>('dia');
 
   const all = stats?.recent_findings ?? [];
 
-  // Chart data derivations
-  const findingsByMonth = useMemo(() => {
+  // ── Data derivations ──────────────────────────────────────────────────────
+
+  const findingsByTime = useMemo(() => {
     const map: Record<string, number> = {};
     all.forEach(f => {
-      const month = f.created_at.slice(0, 7);
-      map[month] = (map[month] || 0) + 1;
+      let key: string;
+      if (granularity === 'mes') {
+        key = f.created_at.slice(0, 7);
+      } else if (granularity === 'dia') {
+        key = f.created_at.slice(0, 10);
+      } else {
+        key = f.created_at.slice(0, 13);
+      }
+      map[key] = (map[key] || 0) + 1;
     });
-    return Object.entries(map)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-12)
-      .map(([month, count]) => ({
-        month: new Date(month + '-01').toLocaleDateString('es-PA', { month: 'short', year: '2-digit' }),
-        count,
-      }));
-  }, [all]);
+
+    const entries = Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+    const limited =
+      granularity === 'hora' ? entries.slice(-7 * 24) :
+      granularity === 'dia'  ? entries.slice(-90) :
+                               entries.slice(-24);
+
+    return limited.map(([key, count]) => {
+      let label: string;
+      if (granularity === 'mes') {
+        label = new Date(key + '-01').toLocaleDateString('es-PA', { month: 'short', year: '2-digit' });
+      } else if (granularity === 'dia') {
+        label = new Date(key + 'T00:00:00').toLocaleDateString('es-PA', { day: 'numeric', month: 'short' });
+      } else {
+        const hour = key.slice(11, 13);
+        const day = new Date(key.slice(0, 10) + 'T00:00:00').toLocaleDateString('es-PA', { day: 'numeric', month: 'short' });
+        label = `${day} ${hour}h`;
+      }
+      return { label, count };
+    });
+  }, [all, granularity]);
 
   const amountByCategory = useMemo(() =>
     Object.entries(
@@ -138,169 +176,307 @@ export function Estadisticas() {
       .slice(0, 10)
       .map(f => ({
         id: f.id,
-        title: truncate(f.title, 48),
+        title: truncate(f.title, 40),
         amount: f.amount_usd!,
         color: SEVERITY_COLORS[f.severity],
       }))
   , [all]);
 
+  const totalAmount = stats?.total_amount_usd ?? 0;
+  const equivalencies = useMemo(() => {
+    if (!totalAmount) return null;
+    return {
+      hospitales:  Math.floor(totalAmount / HOSPITAL_ONCOLOGICO),
+      casas:       Math.floor(totalAmount / CASA_PROMEDIO),
+      plantas:     Math.floor(totalAmount / PLANTA_DE_AGUA),
+      escuelas:    Math.floor(totalAmount / ESCUELA_PUBLICA),
+    };
+  }, [totalAmount]);
+
   const skeleton = <div className="h-64 bg-dark-700 rounded-xl animate-pulse" />;
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+    <div className="flex flex-col min-h-[calc(100vh-4rem)]">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-2">
-          <BarChart2 className="w-7 h-7 text-blue-400" />
-          Estadísticas
-        </h1>
-        <p className="text-gray-400 mt-1 text-sm">
-          Análisis financiero y temporal de los {stats?.total_findings ?? '…'} casos documentados
-        </p>
-      </div>
-
-      {/* Summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Total hallazgos', value: isLoading ? '…' : String(stats?.total_findings ?? 0), color: 'text-white' },
-          { label: 'Fondos comprometidos', value: isLoading ? '…' : formatMoney(stats?.total_amount_usd ?? 0), color: 'text-emerald-400' },
-          { label: 'Casos críticos', value: isLoading ? '…' : String(stats?.by_severity.critico ?? 0), color: 'text-red-400' },
-          { label: 'En investigación', value: isLoading ? '…' : String(stats?.by_severity.medio ?? 0), color: 'text-yellow-400' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-            <p className={`text-2xl font-bold font-mono ${color}`}>{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Chart: Hallazgos por mes */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-        <h2 className="text-base font-semibold text-white mb-4">Hallazgos por mes</h2>
-        {isLoading ? skeleton : (
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={findingsByMonth} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-              <XAxis dataKey="month" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis allowDecimals={false} tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<AreaTip />} cursor={{ stroke: '#374151' }} />
-              <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#areaGrad)" dot={false} activeDot={{ r: 4, fill: '#3b82f6', stroke: '#1e3a5f', strokeWidth: 2 }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      {/* Charts: Category amounts + Severity donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-        {/* Amount by category */}
-        <div className="lg:col-span-3 bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <h2 className="text-base font-semibold text-white mb-4">Monto comprometido por categoría</h2>
-          {isLoading ? skeleton : amountByCategory.length === 0 ? (
-            <p className="text-gray-500 text-sm">Sin datos de montos disponibles.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart layout="vertical" data={amountByCategory} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
-                <XAxis type="number" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => formatMoney(v)} />
-                <YAxis type="category" dataKey="name" width={130} tick={{ fill: '#d1d5db', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<AmountTip />} cursor={{ fill: '#1f2937' }} />
-                <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                  {amountByCategory.map((_, i) => (
-                    <Cell key={i} fill={`hsl(${210 + i * 12}, 70%, ${55 - i * 3}%)`} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Severity donut */}
-        <div className="lg:col-span-2 bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <h2 className="text-base font-semibold text-white mb-4">Distribución por severidad</h2>
-          {isLoading ? skeleton : (
-            <>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={severityData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" paddingAngle={3}>
-                    {severityData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<SeverityTip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                {severityData.map(s => (
-                  <div key={s.name} className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-                    <span className="text-xs text-gray-400">{s.name}</span>
-                    <span className="text-xs font-semibold text-white ml-auto">{s.value}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Chart: Top 10 cases by amount */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-        <h2 className="text-base font-semibold text-white mb-4">Top 10 casos por monto</h2>
-        {isLoading ? skeleton : top10.length === 0 ? (
-          <p className="text-gray-500 text-sm">Sin datos de montos disponibles.</p>
+      {/* ── Persistent: Fondos comprometidos ─────────────────────────────── */}
+      <div className="border-b border-dark-700 bg-dark-900 px-4 sm:px-6 lg:px-8 py-5">
+        {isLoading ? (
+          <div className="h-12 w-64 bg-dark-700 rounded-lg animate-pulse" />
         ) : (
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart layout="vertical" data={top10} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
-              onClick={({ activePayload }) => {
-                const id = activePayload?.[0]?.payload?.id;
-                if (id) navigate(`/hallazgos/${id}`);
-              }}
-            >
-              <XAxis type="number" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => formatMoney(v)} />
-              <YAxis type="category" dataKey="title" width={220} tick={{ fill: '#d1d5db', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<TopTip />} cursor={{ fill: '#1f2937' }} />
-              <Bar dataKey="amount" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }}>
-                {top10.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} fillOpacity={0.85} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <>
+            <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Fondos comprometidos</p>
+            <p className="text-3xl sm:text-4xl font-bold font-mono text-emerald-400 break-all">
+              {rawMoney(totalAmount)}
+            </p>
+            {equivalencies && totalAmount > 0 && (
+              <p className="text-sm text-gray-400 leading-relaxed mt-3 max-w-4xl">
+                Equivale a{' '}
+                <span className="text-white font-semibold">{equivalencies.hospitales.toLocaleString('en-US')}</span>{' '}
+                {equivalencies.hospitales === 1 ? 'hospital oncológico' : 'hospitales oncológicos'},{' '}
+                <span className="text-white font-semibold">{equivalencies.casas.toLocaleString('en-US')}</span>{' '}
+                {equivalencies.casas === 1 ? 'vivienda' : 'viviendas'} para familias panameñas,{' '}
+                <span className="text-white font-semibold">{equivalencies.plantas.toLocaleString('en-US')}</span>{' '}
+                {equivalencies.plantas === 1 ? 'planta de tratamiento de agua' : 'plantas de tratamiento de agua'}, o{' '}
+                <span className="text-white font-semibold">{equivalencies.escuelas.toLocaleString('en-US')}</span>{' '}
+                {equivalencies.escuelas === 1 ? 'escuela pública' : 'escuelas públicas'}.
+              </p>
+            )}
+          </>
         )}
-        <p className="text-xs text-gray-600 mt-2">Haz clic en una barra para ver el caso completo.</p>
       </div>
 
-      {/* Sources */}
-      <section>
-        <h2 className="text-lg font-semibold text-white mb-4">Fuentes</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {SOURCES.map(src => (
-            <a
-              key={src.name}
-              href={src.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group bg-dark-800 border border-dark-700 hover:border-dark-500 rounded-xl p-4 transition-colors flex flex-col gap-2"
+      <div className="flex flex-col lg:flex-row flex-1">
+
+      {/* ── Sidebar navigation ───────────────────────────────────────────── */}
+      <nav className="lg:w-56 lg:flex-shrink-0 lg:border-r border-dark-700 bg-dark-900">
+        {/* Mobile: horizontal scroll */}
+        <div className="flex lg:flex-col overflow-x-auto lg:overflow-x-visible gap-1 p-2 lg:p-3 lg:pt-6">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex-shrink-0 lg:flex-shrink text-left px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap lg:whitespace-normal w-auto lg:w-full
+                ${activeTab === tab.id
+                  ? 'bg-blue-600/20 text-blue-300 font-medium'
+                  : 'text-gray-400 hover:text-white hover:bg-dark-700'}
+              `}
             >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors leading-snug">
-                  {src.name}
-                </p>
-                <ExternalLink className="w-3.5 h-3.5 text-gray-600 group-hover:text-blue-400 flex-shrink-0 mt-0.5 transition-colors" />
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">{src.description}</p>
-            </a>
+              {tab.label}
+            </button>
           ))}
         </div>
-      </section>
+      </nav>
 
-    </main>
+      {/* ── Chart content ────────────────────────────────────────────────── */}
+      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8">
+
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <BarChart2 className="w-6 h-6 text-blue-400 flex-shrink-0" />
+            {TABS.find(t => t.id === activeTab)?.label}
+          </h1>
+          {activeTab !== 'fuentes' && (
+            <p className="text-gray-500 text-sm mt-1">
+              {stats?.total_findings ?? '…'} casos documentados
+            </p>
+          )}
+        </div>
+
+        {/* ── Tab: Hallazgos temporales ─────────────────────────────────── */}
+        {activeTab === 'temporal' && (
+          <div className="space-y-4">
+            {/* Granularity toggle */}
+            <div className="flex items-center gap-2">
+              {([
+                { id: 'hora', label: 'Por hora', Icon: Clock },
+                { id: 'dia',  label: 'Por día',  Icon: CalendarDays },
+                { id: 'mes',  label: 'Por mes',  Icon: Calendar },
+              ] as { id: TimeGranularity; label: string; Icon: typeof Clock }[]).map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setGranularity(id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    granularity === id
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-dark-800 text-gray-400 hover:text-white border border-dark-700'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {isLoading ? skeleton : (
+              <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+                <ResponsiveContainer width="100%" height={380}>
+                  <AreaChart data={findingsByTime} margin={{ top: 4, right: 16, bottom: 24, left: 0 }}>
+                    <defs>
+                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: '#9ca3af', fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      interval="preserveStartEnd"
+                      angle={-35}
+                      textAnchor="end"
+                    />
+                    <YAxis allowDecimals={false} tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<AreaTip />} cursor={{ stroke: '#374151' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      fill="url(#areaGrad)"
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#3b82f6', stroke: '#1e3a5f', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )}
+
+
+        {/* ── Tab: Monto por categoría ──────────────────────────────────── */}
+        {activeTab === 'categorias' && (
+          <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+            {isLoading ? skeleton : amountByCategory.length === 0 ? (
+              <p className="text-gray-500 text-sm">Sin datos de montos disponibles.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={Math.max(320, amountByCategory.length * 52)}>
+                <BarChart
+                  layout="vertical"
+                  data={amountByCategory}
+                  margin={{ top: 0, right: 16, bottom: 0, left: 8 }}
+                >
+                  <XAxis
+                    type="number"
+                    tick={{ fill: '#9ca3af', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={v => formatMoney(v)}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={140}
+                    tick={{ fill: '#d1d5db', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<AmountTip />} cursor={{ fill: '#1f2937' }} />
+                  <Bar dataKey="amount" radius={[0, 4, 4, 0]} barSize={28}>
+                    {amountByCategory.map((_, i) => (
+                      <Cell key={i} fill={`hsl(${210 + i * 14}, 68%, ${58 - i * 2}%)`} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Distribución severidad ───────────────────────────────── */}
+        {activeTab === 'severidad' && (
+          <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 max-w-xl">
+            {isLoading ? skeleton : (
+              <>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={severityData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={80}
+                      outerRadius={120}
+                      dataKey="value"
+                      paddingAngle={3}
+                    >
+                      {severityData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<SeverityTip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  {severityData.map(s => (
+                    <div key={s.name} className="flex items-center gap-2 bg-dark-700 rounded-lg px-3 py-2">
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                      <span className="text-sm text-gray-300">{s.name}</span>
+                      <span className="text-sm font-bold text-white ml-auto">{s.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Top 10 por monto ──────────────────────────────────────── */}
+        {activeTab === 'top10' && (
+          <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+            {isLoading ? skeleton : top10.length === 0 ? (
+              <p className="text-gray-500 text-sm">Sin datos de montos disponibles.</p>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={Math.max(360, top10.length * 46)}>
+                  <BarChart
+                    layout="vertical"
+                    data={top10}
+                    margin={{ top: 0, right: 16, bottom: 0, left: 8 }}
+                    onClick={({ activePayload }) => {
+                      const id = activePayload?.[0]?.payload?.id;
+                      if (id) navigate(`/hallazgos/${id}`);
+                    }}
+                  >
+                    <XAxis
+                      type="number"
+                      tick={{ fill: '#9ca3af', fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={v => formatMoney(v)}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="title"
+                      width={200}
+                      tick={{ fill: '#d1d5db', fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<AmountTip />} cursor={{ fill: '#1f2937' }} />
+                    <Bar dataKey="amount" radius={[0, 4, 4, 0]} barSize={28} style={{ cursor: 'pointer' }}>
+                      {top10.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} fillOpacity={0.85} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="text-xs text-gray-600 mt-3">Haz clic en una barra para ver el caso completo.</p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Fuentes ──────────────────────────────────────────────── */}
+        {activeTab === 'fuentes' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {SOURCES.map(src => (
+              <a
+                key={src.name}
+                href={src.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-dark-800 border border-dark-700 hover:border-dark-500 rounded-xl p-4 transition-colors flex flex-col gap-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors leading-snug">
+                    {src.name}
+                  </p>
+                  <ExternalLink className="w-3.5 h-3.5 text-gray-600 group-hover:text-blue-400 flex-shrink-0 mt-0.5 transition-colors" />
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed">{src.description}</p>
+              </a>
+            ))}
+          </div>
+        )}
+
+      </main>
+    </div>
+    </div>
   );
 }

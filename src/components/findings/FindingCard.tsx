@@ -4,7 +4,7 @@ import { Calendar, ChevronRight, Plus, Users } from 'lucide-react';
 import { type Finding, type Reaction } from '../../types';
 import { SeverityBadge } from '@/components/app/SeverityBadge';
 import { EmojiPickerPortal } from '@/components/app/EmojiPickerPortal';
-import { Card } from "@/components/ui/card";
+
 import { formatDate, formatMoney, truncate, SEVERITY_COLORS } from '../../lib/utils';
 import { useAddReaction, useRemoveReaction } from '../../hooks/useFindingComments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,20 +74,20 @@ export function FindingCard({ finding }: Props) {
   return (
     <Link
       to={`/hallazgos/${finding.id}`}
-      className="group block h-full"
+      className="group block md:h-full"
     >
-      <Card
-        className="bg-dark-800 border-dark-600 hover:border-dark-500 transition-all hover:shadow-lg hover:shadow-black/30 p-5 flex flex-col h-full"
+      <div
+        className="px-4 py-3 flex flex-col md:p-5 md:bg-dark-800 md:border md:border-dark-600 md:rounded-xl md:hover:border-dark-500 md:hover:shadow-lg md:hover:shadow-black/30 md:h-full transition-all"
         style={{ borderLeftColor: SEVERITY_COLORS[finding.severity], borderLeftWidth: 3 }}
       >
         <div className="flex items-start justify-between gap-3 mb-3">
-          <h3 className="font-semibold text-white text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2 min-h-[2.5rem]">
+          <h3 className="font-semibold text-white text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2 md:min-h-[2.5rem]">
             {finding.title}
           </h3>
           <SeverityBadge severity={finding.severity} size="sm" />
         </div>
 
-        <p className="text-gray-400 text-xs leading-relaxed mb-4 line-clamp-3 min-h-[3.75rem]">
+        <p className="text-gray-400 text-xs leading-relaxed mb-4 line-clamp-3 md:min-h-[3.75rem]">
           {finding.summary}
         </p>
 
@@ -162,7 +162,7 @@ export function FindingCard({ finding }: Props) {
             onClose={() => setShowPicker(false)}
           />
         )}
-      </Card>
+      </div>
     </Link>
   );
 }

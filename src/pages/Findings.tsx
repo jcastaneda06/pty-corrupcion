@@ -34,35 +34,37 @@ export function Findings() {
   const { data: findings, isLoading, error } = useFindings(filters);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <div>
+    <main className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="px-4 sm:px-0">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <FileText className="w-6 h-6 text-blue-400" />
-          Hallazgos
+          Casos
         </h1>
         <p className="text-gray-400 text-sm mt-1">
           Todos los casos de corrupción documentados en Panamá
         </p>
       </div>
 
-      <FiltersComponent filters={filters} onChange={setFilters} />
+      <div className="px-4 sm:px-0">
+        <FiltersComponent filters={filters} onChange={setFilters} />
+      </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
-          Error al cargar los hallazgos. Verifica tu conexión a Supabase.
+        <div className="mx-4 sm:mx-0 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+          Error al cargar los casos. Verifica tu conexión a Supabase.
         </div>
       )}
 
       {!isLoading && findings && (
-        <p className="text-sm text-gray-500">
-          {findings.length} {findings.length === 1 ? 'hallazgo encontrado' : 'hallazgos encontrados'}
+        <p className="text-sm text-gray-500 px-4 sm:px-0">
+          {findings.length} {findings.length === 1 ? 'caso encontrado' : 'casos encontrados'} hasta hoy
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="divide-y divide-dark-700 md:divide-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
         {isLoading
           ? Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="bg-dark-800 border border-dark-600 rounded-xl p-5 space-y-3 animate-pulse">
+              <div key={i} className="px-4 py-3 md:p-5 md:bg-dark-800 md:border md:border-dark-600 md:rounded-xl space-y-3 animate-pulse">
                 <div className="flex items-start justify-between gap-3">
                   <div className="h-5 bg-dark-700 rounded w-3/4" />
                   <div className="h-5 bg-dark-700 rounded w-16" />
@@ -84,9 +86,9 @@ export function Findings() {
       </div>
 
       {!isLoading && findings?.length === 0 && (
-        <div className="text-center py-20 text-gray-500">
+        <div className="text-center py-20 text-gray-500 px-4 sm:px-0">
           <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="text-lg font-medium">No se encontraron hallazgos</p>
+          <p className="text-lg font-medium">No se encontraron casos</p>
           <p className="text-sm mt-1">Intenta ajustar los filtros de búsqueda</p>
         </div>
       )}

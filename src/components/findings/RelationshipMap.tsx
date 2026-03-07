@@ -152,7 +152,7 @@ export function RelationshipMap({ findingPeople, relationships, severity }: Rela
   if (findingPeople.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500 text-sm bg-dark-800 rounded-xl border border-dark-600">
-        No hay personas registradas para este hallazgo.
+        No hay personas registradas para este caso.
       </div>
     );
   }

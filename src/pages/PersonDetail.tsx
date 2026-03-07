@@ -4,7 +4,7 @@ import { usePerson } from '../hooks/useFinding';
 import { SeverityBadge } from '@/components/app/SeverityBadge';
 import { MoneyAmount } from '@/components/app/MoneyAmount';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { getInitials, formatDate } from '../lib/utils';
 import { type Finding } from '../types';
 
@@ -14,7 +14,7 @@ export function PersonDetail() {
 
   if (isLoading) {
     return (
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="max-w-3xl mx-auto px-0 sm:px-6 lg:px-8 py-8 space-y-6">
         <Skeleton className="h-6 w-32 bg-dark-700" />
         <div className="flex gap-4 items-start">
           <Skeleton className="h-20 w-20 rounded-full bg-dark-700" />
@@ -30,7 +30,7 @@ export function PersonDetail() {
 
   if (error || !person) {
     return (
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-3xl mx-auto px-0 sm:px-6 lg:px-8 py-8">
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
           <p className="text-red-400 font-medium">Persona no encontrada</p>
           <Link to="/" className="text-blue-400 text-sm mt-2 inline-block hover:underline">
@@ -48,19 +48,20 @@ export function PersonDetail() {
   );
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <main className="max-w-3xl mx-auto px-0 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Back */}
-      <Link
-        to="/"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Inicio
-      </Link>
+      <div className="px-4 sm:px-0">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Inicio
+        </Link>
+      </div>
 
       {/* Person header */}
-      <Card className="bg-dark-800 border-dark-600">
-        <CardContent className="p-6">
+      <div className="px-4 py-4 sm:bg-dark-800 sm:border sm:border-dark-600 sm:rounded-xl sm:p-6">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold text-white flex-shrink-0">
               {getInitials(person.name)}
@@ -104,18 +105,17 @@ export function PersonDetail() {
               {person.bio}
             </p>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Findings */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          Hallazgos Relacionados ({findingRecords.length})
+        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 px-4 sm:px-0">
+          Casos Relacionados ({findingRecords.length})
         </h2>
         {findingRecords.length === 0 ? (
-          <p className="text-gray-500 text-sm">No hay hallazgos registrados.</p>
+          <p className="text-gray-500 text-sm px-4 sm:px-0">No hay casos registrados.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-dark-700 sm:divide-y-0 sm:space-y-3">
             {findingRecords.map((fp) => {
               const finding = (fp as { finding?: Finding }).finding;
               if (!finding) return null;
@@ -123,7 +123,7 @@ export function PersonDetail() {
                 <Link
                   key={fp.id}
                   to={`/hallazgos/${finding.id}`}
-                  className="block bg-dark-800 border border-dark-600 hover:border-dark-500 rounded-xl p-4 transition-all"
+                  className="block px-4 py-3 sm:px-0 sm:bg-dark-800 sm:border sm:border-dark-600 sm:hover:border-dark-500 sm:rounded-xl sm:p-4 transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>

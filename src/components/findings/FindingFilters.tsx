@@ -96,7 +96,7 @@ export function FindingFilters({ filters, onChange }: Props) {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
         <Input
           type="text"
-          placeholder="Buscar hallazgos…"
+          placeholder="Buscar casos…"
           value={filters.search ?? ''}
           onChange={(e) => update({ search: e.target.value })}
           className="bg-dark-700 border-dark-500 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 h-9 pl-9"

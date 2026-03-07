@@ -14,7 +14,7 @@ import {
 
 const navLinks = [
   { to: '/', label: 'Panel', icon: LayoutDashboard, exact: true },
-  { to: '/hallazgos', label: 'Hallazgos', icon: FileText, exact: false },
+  { to: '/hallazgos', label: 'Casos', icon: FileText, exact: false },
   { to: '/estadisticas', label: 'Estadísticas', icon: BarChart2, exact: false },
   { to: '/indice', label: 'Índice', icon: TrendingDown, exact: false },
 ];
