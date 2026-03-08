@@ -77,6 +77,9 @@ const SEARCH_QUERIES = [
   "telefonia panama lavado de dinero",
   "mas movil panama estafa",
   "tigo panama estafa",
+  "costo de vida",
+  "precio de la gasolina",
+  "precio de vivienda",
 
   // Government & political
   "funcionario imputado panama",
@@ -142,11 +145,59 @@ const SEARCH_QUERIES = [
   "Panama corruption in public international declaration",
 ];
 
+// ── Financial / money-corruption categories ───────────────────────────────────
+// Used to guarantee at least 2 money-related findings per run.
+
+const MONEY_CATEGORIES = new Set([
+  "Fraude en Contratación Pública",
+  "Peculado / Malversación",
+  "Lavado de Dinero",
+  "Soborno / Cohecho",
+  "Tráfico de Influencias",
+  "Captura del Estado",
+]);
+
+// Targeted queries run as a supplemental pass when the main scrape produces
+// fewer than 2 money-related findings. These focus on financial corruption only.
+const MONEY_QUERIES = [
+  "peculado panama",
+  "soborno funcionario panama",
+  "malversacion fondos publicos panama",
+  "lavado dinero panama",
+  "fiscalia anticorrupcion panama",
+  "contraloria panama irregularidades",
+  "licitacion irregular panama",
+  "contratos publicos panama fraude",
+  "enriquecimiento ilicito panama",
+  "desfalco panama",
+  "trafico influencias panama",
+  "Panama bribery indictment",
+  "Panama public funds misuse",
+  "Panama money laundering",
+  "Panama corruption fraud",
+];
+
 // ── RSS feed URL builders + Bing redirect resolver ────────────────────────────
 
-function googleNewsRssUrl(query: string): string {
-  const encoded = encodeURIComponent(query);
+// timeAppend is appended to the query string and supports Google News operators
+// such as "when:30d" (recent) or "after:2023-01-01 before:2024-01-01" (archive).
+function googleNewsRssUrl(query: string, timeAppend = ""): string {
+  const q = timeAppend ? `${query} ${timeAppend}` : query;
+  const encoded = encodeURIComponent(q);
   return `https://news.google.com/rss/search?q=${encoded}&hl=es-419&gl=PA&ceid=PA:es-419`;
+}
+
+// Compute a dynamic archive date range: 2 years ago → 1 year ago (Panama UTC-5).
+// Refreshes every run so the window keeps advancing.
+function archiveDateFilter(): string {
+  const nowPanamaMs = Date.now() - 5 * 60 * 60 * 1000;
+  const now = new Date(nowPanamaMs);
+  const threeYearsAgo = new Date(now);
+  threeYearsAgo.setFullYear(now.getFullYear() - 3);
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+  // Fixed start of 2000 so the window covers major historical cases:
+  // Torrijos (2004–2009), Panama Papers (2016), Martinelli (2014+), etc.
+  return `after:2000-01-01 before:${fmt(threeYearsAgo)}`;
 }
 
 // ── Helper: verify a URL returns a 2xx response ───────────────────────────────
@@ -358,7 +409,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta (sin 
     {
       "name": "Nombre Completo",
       "role": "cargo o rol",
-      "role_in_case": "rol en el caso (acusado, condenado, investigado, testigo, implicado)",
+      "role_in_case": "rol en el caso (acusado, condenado, investigado, testigo, implicado, victima)",
       "amount_usd": number | null,
       "is_convicted": boolean,
       "is_public_figure": boolean
@@ -459,7 +510,7 @@ async function clusterItemsIntoGroups(
     .join("\n");
 
   try {
-    const clusterPrompt = `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos sobre distintos casos van separados aunque compartan el mismo tema general.
+    const clusterPrompt = `Agrupa los siguientes artículos de noticias por caso/evento específico. Artículos sobre el mismo escándalo, persona imputada, contrato o incidente van juntos. Artículos que involucren a las mismas personas o casos van juntos.
 
 ${itemList}
 
@@ -604,12 +655,13 @@ async function callGemini(
 // All items in the group are about the same case; one finding is created with
 // one source row per verified URL.
 
+// Returns the finding's category string on success, or false if skipped/failed.
 async function processArticle(
   supabase: ReturnType<typeof createClient>,
   apiKey: string,
   items: RssItem[],
   content: ArticleContent,
-): Promise<boolean> {
+): Promise<string | false> {
   const primaryItem = items[0];
 
   let extracted: Record<string, unknown>;
@@ -762,8 +814,11 @@ async function processArticle(
       .then(() => {});
   }
 
-  console.log(`  ✓ Created finding: ${extracted.title}`);
-  return true;
+  const category = String(
+    extracted.category ?? "Fraude en Contratación Pública",
+  );
+  console.log(`  ✓ Created finding [${category}]: ${extracted.title}`);
+  return category;
 }
 
 // ── Pre-screen raw articles for relevance by title ────────────────────────────
@@ -842,16 +897,27 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
   let articlesFound = 0;
   let findingsCreated = 0;
+  let moneyFindingsCreated = 0;
   let lastError: string | null = null;
 
   try {
-    // Step 1: fetch all Google News RSS feeds in parallel (~36 requests at once, ~10s total)
-    const allFeeds = SEARCH_QUERIES.map((q) => ({
-      feedUrl: googleNewsRssUrl(q),
-      label: `google:${q}`,
-    }));
+    // Step 1: fetch all Google News RSS feeds in parallel.
+    // Half of the queries use a 30-day recency filter; the other half use an
+    // archive window (2 years ago → 1 year ago) so each run covers both fresh
+    // news AND older cases that haven't been ingested yet.
+    const archiveFilter = archiveDateFilter();
+    const midpoint = Math.ceil(SEARCH_QUERIES.length / 2);
+    const allFeeds = SEARCH_QUERIES.map((q, i) => {
+      const timeAppend = i < midpoint ? "when:30d" : archiveFilter;
+      return {
+        feedUrl: googleNewsRssUrl(q, timeAppend),
+        label: `google:${q}:${i < midpoint ? "recent" : "archive"}`,
+      };
+    });
 
-    console.log(`Fetching ${allFeeds.length} RSS feeds in parallel…`);
+    console.log(
+      `Fetching ${allFeeds.length} RSS feeds in parallel (${midpoint} recent + ${allFeeds.length - midpoint} archive)…`,
+    );
     const feedResults = await Promise.all(
       allFeeds.map((f) => fetchRssItems(f.feedUrl)),
     );
@@ -935,7 +1001,62 @@ Deno.serve(async (req: Request) => {
           return processArticle(supabase, geminiKey, group, content);
         }),
       );
-      findingsCreated += results.filter(Boolean).length;
+      for (const r of results) {
+        if (r !== false) {
+          findingsCreated++;
+          if (MONEY_CATEGORIES.has(r)) moneyFindingsCreated++;
+        }
+      }
+    }
+
+    // ── Supplemental money-corruption pass ────────────────────────────────────
+    // If fewer than 2 financial/money findings were created, fetch targeted
+    // money-corruption RSS feeds and process them until we reach 2 or run out.
+    if (moneyFindingsCreated < 2 && Date.now() - startTime < TIME_BUDGET_MS) {
+      console.log(
+        `Only ${moneyFindingsCreated} money finding(s) so far — running supplemental money-corruption pass`,
+      );
+
+      const moneyMidpoint = Math.ceil(MONEY_QUERIES.length / 2);
+      const moneyFeeds = MONEY_QUERIES.map((q, i) =>
+        googleNewsRssUrl(q, i < moneyMidpoint ? "when:30d" : archiveFilter),
+      );
+      const moneyFeedResults = await Promise.all(
+        moneyFeeds.map((url) => fetchRssItems(url)),
+      );
+
+      const moneyQueue: RssItem[] = [];
+      for (const items of moneyFeedResults) {
+        for (const item of items) {
+          if (!item.url || processedUrls.has(item.url) || knownUrls.has(item.url)) continue;
+          processedUrls.add(item.url);
+          moneyQueue.push(item);
+        }
+      }
+      console.log(`Supplemental pass: ${moneyQueue.length} new money-related articles`);
+
+      if (moneyQueue.length > 0) {
+        const moneyRelevant = await preScreenArticles(geminiKey, moneyQueue);
+        const moneyGroups = await clusterItemsIntoGroups(geminiKey, moneyRelevant);
+
+        for (const group of moneyGroups) {
+          if (moneyFindingsCreated >= 2) break;
+          if (Date.now() - startTime > TIME_BUDGET_MS) break;
+          articlesFound += group.length;
+          console.log(
+            `  [money pass] Processing group (${group.length} article${group.length > 1 ? "s" : ""}): ${group[0].title || group[0].url}`,
+          );
+          const content = resolveGroupContent(group);
+          const result = await processArticle(supabase, geminiKey, group, content);
+          if (result !== false) {
+            findingsCreated++;
+            if (MONEY_CATEGORIES.has(result)) moneyFindingsCreated++;
+          }
+        }
+        console.log(
+          `Supplemental pass done — total money findings this run: ${moneyFindingsCreated}`,
+        );
+      }
     }
   } catch (e) {
     lastError = e instanceof Error ? e.message : String(e);

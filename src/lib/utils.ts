@@ -87,6 +87,25 @@ export function truncate(text: string, maxLength: number): string {
 }
 
 /**
+ * Format a date string as Spanish relative time (e.g. "hace 2 horas")
+ */
+export function formatRelativeTime(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  if (diffSecs < 60) return 'hace un momento';
+  const diffMins = Math.floor(diffSecs / 60);
+  if (diffMins < 60) return `hace ${diffMins} ${diffMins === 1 ? 'minuto' : 'minutos'}`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `hace ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `hace ${diffDays} ${diffDays === 1 ? 'día' : 'días'}`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `hace ${diffMonths} ${diffMonths === 1 ? 'mes' : 'meses'}`;
+  const diffYears = Math.floor(diffMonths / 12);
+  return `hace ${diffYears} ${diffYears === 1 ? 'año' : 'años'}`;
+}
+
+/**
  * Get initials from a full name
  */
 export function getInitials(name: string): string {

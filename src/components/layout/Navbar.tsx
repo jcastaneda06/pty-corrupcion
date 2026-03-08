@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getInitials } from '../../lib/utils';
+import { NotificationBell } from './NotificationBell';
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -112,6 +113,7 @@ export function Navbar() {
 
           {/* Right side: auth + mobile toggle */}
           <div className="flex items-center gap-2">
+            {!isLoading && user && <NotificationBell />}
             <div className="hidden sm:block">
               <UserMenu />
             </div>

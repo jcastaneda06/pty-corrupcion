@@ -1,5 +1,18 @@
 export type Severity = 'critico' | 'alto' | 'medio' | 'bajo';
 
+export type NotificationType = 'system' | 'reaction' | 'comment_reply';
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+}
+
 export type RelationshipType = 'familiar' | 'socio_comercial' | 'politico' | 'empleado' | 'otro';
 
 export interface FindingComment {
