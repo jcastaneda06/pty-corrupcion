@@ -12,6 +12,7 @@ import { NotFound } from './pages/NotFound';
 import { CorruptionIndex } from './pages/CorruptionIndex';
 import { Estadisticas } from './pages/Estadisticas';
 import { Apoyanos } from './pages/Apoyanos';
+import { Politicos } from './pages/Politicos';
 import { Analytics } from "@vercel/analytics/react"
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -45,6 +46,7 @@ function AppInner() {
         <Route path="/indice" element={<CorruptionIndex />} />
         <Route path="/estadisticas" element={<Estadisticas />} />
         <Route path="/apoyanos" element={<Apoyanos />} />
+        <Route path="/politicos" element={<Politicos />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

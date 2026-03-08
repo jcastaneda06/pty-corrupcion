@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Heart, Menu, LogOut, Sun, Moon } from 'lucide-react';
+import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Heart, UserRoundCheck, Menu, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getInitials } from '../../lib/utils';
@@ -20,6 +20,7 @@ const navLinks = [
   { to: '/casos', label: 'Casos', icon: FileText, exact: false },
   { to: '/estadisticas', label: 'Estadísticas', icon: BarChart2, exact: false },
   { to: '/indice', label: 'Índice', icon: TrendingDown, exact: false },
+  { to: '/politicos', label: 'Políticos', icon: UserRoundCheck, exact: false },
   { to: '/apoyanos', label: 'Apóyanos', icon: Heart, exact: false },
 ];
 

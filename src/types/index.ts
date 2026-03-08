@@ -129,3 +129,26 @@ export interface FindingFilters {
   dateTo?: string;
   sort?: 'date_desc' | 'date_asc' | '';
 }
+
+export interface Politician {
+  id: string;
+  person_id: string;
+  political_position: string | null;
+  political_party: string | null;
+  tenure_start: string | null;
+  tenure_end: string | null;
+  photo_url: string | null;
+  photo_source_url: string | null;
+  photo_source_name: string | null;
+  is_processed: boolean;
+  created_at: string;
+  person?: Person;
+  finding_count?: number;
+}
+
+export interface PoliticianFilters {
+  search?: string;
+  position?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
