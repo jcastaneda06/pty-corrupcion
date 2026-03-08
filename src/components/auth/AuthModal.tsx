@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,39 @@ export function AuthModal() {
   const [errorMsg, setErrorMsg] = useState('');
   const [signedUp, setSignedUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendMsg, setResendMsg] = useState('');
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (signedUp) {
+      setResendCooldown(60);
+      timerRef.current = setInterval(() => {
+        setResendCooldown((s) => {
+          if (s <= 1) { clearInterval(timerRef.current!); return 0; }
+          return s - 1;
+        });
+      }, 1000);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [signedUp]);
+
+  const handleResend = async () => {
+    setResendMsg('');
+    const { error } = await signUp(email, password);
+    if (error) {
+      setResendMsg(translateError(error.message));
+    } else {
+      setResendMsg('¡Email reenviado! Revisa tu bandeja.');
+      setResendCooldown(60);
+      timerRef.current = setInterval(() => {
+        setResendCooldown((s) => {
+          if (s <= 1) { clearInterval(timerRef.current!); return 0; }
+          return s - 1;
+        });
+      }, 1000);
+    }
+  };
 
   const switchMode = (next: 'login' | 'signup') => {
     setMode(next);
@@ -68,9 +101,20 @@ export function AuthModal() {
         </DialogHeader>
 
         {signedUp ? (
-          <div className="text-center py-6">
+          <div className="text-center py-6 space-y-4">
             <p className="text-emerald-400 font-semibold mb-2">¡Cuenta creada!</p>
             <p className="text-sm text-gray-400">Revisa tu email para confirmar tu cuenta.</p>
+            {resendMsg && (
+              <p className="text-xs text-emerald-400">{resendMsg}</p>
+            )}
+            <Button
+              onClick={handleResend}
+              disabled={resendCooldown > 0}
+              variant="outline"
+              className="w-full border-dark-600 text-gray-300 hover:text-white hover:bg-dark-700 disabled:opacity-50"
+            >
+              {resendCooldown > 0 ? `Reenviar email (${resendCooldown}s)` : 'Reenviar email de confirmación'}
+            </Button>
           </div>
         ) : (
           <>
