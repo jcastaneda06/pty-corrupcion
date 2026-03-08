@@ -3,7 +3,16 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* ── Dark theme (default) ── */
+  :root, .dark {
+    --color-case-title: 255 255 255;   /* #fff */
+    --color-dark-950: 10 10 15;
+    --color-dark-900: 15 15 26;
+    --color-dark-800: 26 26 46;
+    --color-dark-700: 22 33 62;
+    --color-dark-600: 30 42 74;
+    --color-dark-500: 36 51 88;
+
     --background: 10 10 15;
     --foreground: 255 255 255;
     --card: 26 26 46;
@@ -31,6 +40,47 @@
     --chart-5: 59 130 246;
   }
 
+  /* ── Light theme ──
+     Derived from the dark theme's H≈225° navy-blue-purple DNA, at high lightness.
+     Hierarchy (lightest → darkest): card(800) > page(950) > nav(900) > border(600)
+  */
+  .light {
+    --color-case-title: 10 10 15;      /* dark mode bg — #0a0a0f */
+    /* Surface scale — same hue family as dark mode, lifted to pastel range */
+    --color-dark-950: 205 215 242;   /* #cdd7f2  page background */
+    --color-dark-900: 190 202 232;   /* #becae8  navbar — slightly darker / more saturated */
+    --color-dark-800: 228 234 251;   /* #e4eafb  card face — lighter than page so cards pop */
+    --color-dark-700: 215 224 245;   /* #d7e0f5  card inner sections / hover bg */
+    --color-dark-600: 164 182 218;   /* #a4b6da  borders */
+    --color-dark-500: 124 148 196;   /* #7c94c4  stronger borders / accents */
+
+    /* shadcn/ui CSS vars */
+    --background: 205 215 242;
+    --foreground: 15 23 42;
+    --card: 228 234 251;
+    --card-foreground: 15 23 42;
+    --popover: 228 234 251;
+    --popover-foreground: 15 23 42;
+    --primary: 29 78 216;
+    --primary-foreground: 255 255 255;
+    --secondary: 215 224 245;
+    --secondary-foreground: 51 65 85;
+    --muted: 215 224 245;
+    --muted-foreground: 71 85 105;
+    --accent: 215 224 245;
+    --accent-foreground: 15 23 42;
+    --destructive: 185 28 28;
+    --destructive-foreground: 255 255 255;
+    --border: 164 182 218;
+    --input: 215 224 245;
+    --ring: 29 78 216;
+    --chart-1: 185 28 28;
+    --chart-2: 194 65 12;
+    --chart-3: 146 64 14;
+    --chart-4: 21 128 61;
+    --chart-5: 29 78 216;
+  }
+
   * {
     box-sizing: border-box;
     @apply border-border;
@@ -42,15 +92,17 @@
   }
 
   body {
-    @apply bg-dark-950 text-white antialiased;
+    @apply bg-dark-950 antialiased;
     font-family: 'Inter', system-ui, sans-serif;
   }
 
+  /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { @apply bg-dark-900; }
   ::-webkit-scrollbar-thumb { @apply bg-dark-600 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-dark-500; }
 
+  /* ── React Flow ── */
   .react-flow__attribution { display: none; }
   .react-flow__controls-button {
     background: #1a1a2e !important;
@@ -59,8 +111,17 @@
   }
   .react-flow__controls-button:hover { background: #16213e !important; }
 
-  select option { background-color: #1a1a2e; color: white; }
+  .light .react-flow__controls-button {
+    background: #e4eafb !important;
+    border-color: #a4b6da !important;
+    fill: #334155 !important;
+  }
+  .light .react-flow__controls-button:hover { background: #d7e0f5 !important; }
 
+  select option { background-color: #1a1a2e; color: white; }
+  .light select option { background-color: #e4eafb; color: #0f172a; }
+
+  /* ── Emoji Picker ── */
   .EmojiPickerReact {
     --epr-dark-bg-color: #1a1a2e !important;
     --epr-dark-category-label-bg-color: #1a1a2ee6 !important;
@@ -92,4 +153,44 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
   }
+
+  /* ════════════════════════════════════════════
+     LIGHT MODE OVERRIDES
+     Placed in @layer utilities so they outrank
+     Tailwind's own utility color classes.
+  ════════════════════════════════════════════ */
+
+  /* ── Primary text ── */
+  .light .text-white              { color: #0f172a; }
+  .light .hover\:text-white:hover { color: #0f172a; }
+  .light .focus\:text-white:focus { color: #0f172a; }
+
+  /* Preserve white text on solid colored buttons */
+  .light .bg-blue-600.text-white,
+  .light .bg-blue-500.text-white,
+  .light .bg-blue-700.text-white  { color: white; }
+
+  /* ── Neutral grays ── */
+  .light .text-gray-300 { color: #475569; }
+  .light .text-gray-400 { color: #1e293b; }
+  .light .text-gray-500 { color: #334155; }
+  .light .text-gray-600 { color: #1e293b; }
+
+  /* ── Low-contrast colored text ── */
+  .light .text-blue-200   { color: #1e40af; }
+  .light .text-blue-300   { color: #1d4ed8; }
+  .light .text-blue-400   { color: #1d4ed8; }
+  .light .text-red-300    { color: #991b1b; }
+  .light .text-red-400    { color: #b91c1c; }
+  .light .text-orange-300 { color: #9a3412; }
+  .light .text-orange-400 { color: #c2410c; }
+  .light .text-yellow-300 { color: #78350f; }
+  .light .text-yellow-400 { color: #92400e; }
+  .light .text-green-300  { color: #166534; }
+  .light .text-green-400  { color: #15803d; }
+  .light .text-emerald-400 { color: #047857; }
+
+  /* ── Group-hover colored text ── */
+  .light .group:hover .group-hover\:text-blue-300 { color: #1d4ed8; }
+  .light .group:hover .group-hover\:text-blue-400 { color: #1d4ed8; }
 }

@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useRef, useState } from "react";
+import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
   ExternalLink,
@@ -13,23 +13,27 @@ import {
   Send,
   Plus,
   LogIn,
-} from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { useFinding, useFindingRelationships } from '../hooks/useFinding';
-import { useAddFindingComment, useAddReaction, useRemoveReaction } from '../hooks/useFindingComments';
-import { RelationshipMap } from '../components/findings/RelationshipMap';
-import { SeverityBadge } from '@/components/app/SeverityBadge';
-import { EmojiPickerPortal } from '@/components/app/EmojiPickerPortal';
-import { MoneyAmount } from '@/components/app/MoneyAmount';
-import { PersonChip } from '@/components/app/PersonChip';
-import { Skeleton } from '@/components/ui/skeleton';
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
+import { useFinding, useFindingRelationships } from "../hooks/useFinding";
+import {
+  useAddFindingComment,
+  useAddReaction,
+  useRemoveReaction,
+} from "../hooks/useFindingComments";
+import { RelationshipMap } from "../components/findings/RelationshipMap";
+import { SeverityBadge } from "@/components/app/SeverityBadge";
+import { EmojiPickerPortal } from "@/components/app/EmojiPickerPortal";
+import { MoneyAmount } from "@/components/app/MoneyAmount";
+import { PersonChip } from "@/components/app/PersonChip";
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { formatDate, getInitials, SEVERITY_COLORS } from '../lib/utils';
-import { useAuth } from '../contexts/AuthContext';
-import { type Reaction } from '../types';
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { formatDate, getInitials, SEVERITY_COLORS } from "../lib/utils";
+import { useAuth } from "../contexts/AuthContext";
+import { type Reaction } from "../types";
 
 function groupReactions(reactions: Reaction[]): [string, number][] {
   const map: Record<string, number> = {};
@@ -50,7 +54,7 @@ export function FindingDetail() {
 
   const [showPicker, setShowPicker] = useState(false);
   const pickerBtnRef = useRef<HTMLButtonElement>(null);
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
 
   if (isLoading) {
     return (
@@ -69,7 +73,10 @@ export function FindingDetail() {
       <main className="max-w-4xl mx-auto px-0 sm:px-6 lg:px-8 py-8">
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
           <p className="text-red-400 font-medium">Caso no encontrado</p>
-          <Link to="/casos" className="text-blue-400 text-sm mt-2 inline-block hover:underline">
+          <Link
+            to="/casos"
+            className="text-blue-400 text-sm mt-2 inline-block hover:underline"
+          >
             ← Volver a casos
           </Link>
         </div>
@@ -90,11 +97,14 @@ export function FindingDetail() {
   const displayName =
     user?.user_metadata?.full_name ??
     user?.user_metadata?.name ??
-    user?.email?.split('@')[0] ??
-    'Usuario';
+    user?.email?.split("@")[0] ??
+    "Usuario";
 
   const handleReaction = (emoji: string) => {
-    if (!user) { openAuthModal(); return; }
+    if (!user) {
+      openAuthModal();
+      return;
+    }
     if (myReactionEmojis.has(emoji)) {
       removeReaction.mutate({ findingId: finding.id, emoji, userId: user.id });
       setShowPicker(false);
@@ -102,10 +112,18 @@ export function FindingDetail() {
     }
     if (myReactions.length >= 3) {
       const oldest = [...myReactions].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )[0];
-      removeReaction.mutateAsync({ findingId: finding.id, emoji: oldest.emoji, userId: user.id })
-        .then(() => addReaction.mutate({ findingId: finding.id, emoji, userId: user.id }));
+      removeReaction
+        .mutateAsync({
+          findingId: finding.id,
+          emoji: oldest.emoji,
+          userId: user.id,
+        })
+        .then(() =>
+          addReaction.mutate({ findingId: finding.id, emoji, userId: user.id }),
+        );
       setShowPicker(false);
       return;
     }
@@ -119,10 +137,10 @@ export function FindingDetail() {
     await addComment.mutateAsync({
       user_id: user.id,
       author_name: displayName,
-      author_email: user.email ?? '',
+      author_email: user.email ?? "",
       content: content.trim(),
     });
-    setContent('');
+    setContent("");
   };
 
   return (
@@ -140,7 +158,7 @@ export function FindingDetail() {
 
       {/* Header */}
       <header className="space-y-4 px-4 sm:px-0">
-        <div className="flex flex-wrap items-start gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <SeverityBadge severity={finding.severity} size="lg" />
           <span className="text-xs bg-dark-700 text-gray-400 border border-dark-500 rounded px-2 py-1 flex items-center gap-1">
             <Tag className="w-3 h-3" />
@@ -148,10 +166,7 @@ export function FindingDetail() {
           </span>
         </div>
 
-        <h1
-          className="text-2xl sm:text-3xl font-bold leading-tight"
-          style={{ color: '#fff' }}
-        >
+        <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-case-title">
           <span
             className="border-l-4 pl-3"
             style={{ borderColor: severityColor }}
@@ -187,7 +202,9 @@ export function FindingDetail() {
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Resumen
         </h2>
-        <p className="text-gray-200 leading-relaxed whitespace-pre-line">{finding.summary}</p>
+        <p className="text-gray-400 leading-relaxed whitespace-pre-line">
+          {finding.summary}
+        </p>
         {finding.source_url && (
           <a
             href={finding.source_url}
@@ -208,22 +225,29 @@ export function FindingDetail() {
               <button
                 key={emoji}
                 onClick={() => handleReaction(emoji)}
-                title={mine ? 'Quitar reacción' : undefined}
+                title={mine ? "Quitar reacción" : undefined}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors shadow-sm ${
                   mine
-                    ? 'bg-blue-900 border-blue-600 text-blue-200 hover:bg-blue-800'
-                    : 'bg-dark-800 border-dark-600 hover:bg-dark-700 hover:border-dark-500 text-gray-300'
+                    ? "bg-blue-900 border-blue-600 text-blue-200 hover:bg-blue-800"
+                    : "bg-dark-800 border-dark-600 hover:bg-dark-700 hover:border-dark-500 text-gray-300"
                 }`}
               >
                 <span>{emoji}</span>
-                <span className={`font-mono text-xs ${mine ? 'text-blue-300' : 'text-gray-400'}`}>{count}</span>
+                <span
+                  className={`font-mono text-xs ${mine ? "text-blue-300" : "text-gray-400"}`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
           <button
             ref={pickerBtnRef}
             onClick={() => {
-              if (!user) { openAuthModal(); return; }
+              if (!user) {
+                openAuthModal();
+                return;
+              }
               setShowPicker((v) => !v);
             }}
             className="flex items-center gap-1 px-3 py-1 bg-dark-800 hover:bg-dark-700 border border-dark-600 hover:border-dark-500 rounded-full text-sm text-gray-500 hover:text-gray-300 transition-colors shadow-sm"
@@ -250,35 +274,41 @@ export function FindingDetail() {
             Personas Involucradas ({people.length})
           </h2>
           <div className="space-y-3">
-            {people.map((fp) => (
-              fp.person && (
-                <div
-                  key={fp.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-dark-700 last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <PersonChip
-                      person={fp.person}
-                      showAmount={fp.amount_usd}
-                      showConvicted={fp.is_convicted}
-                    />
-                    {fp.role_in_case && (
-                      <span className="text-xs text-gray-500">{fp.role_in_case}</span>
-                    )}
+            {people.map(
+              (fp) =>
+                fp.person && (
+                  <div
+                    key={fp.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-dark-700 last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <PersonChip
+                        person={fp.person}
+                        showAmount={fp.amount_usd}
+                        showConvicted={fp.is_convicted}
+                      />
+                      {fp.role_in_case && (
+                        <span className="text-xs text-gray-500">
+                          {fp.role_in_case}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {fp.is_convicted && (
+                        <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/30 rounded px-2 py-0.5">
+                          Condenado
+                        </span>
+                      )}
+                      {fp.amount_usd && (
+                        <MoneyAmount
+                          amount={fp.amount_usd}
+                          className="text-sm"
+                        />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {fp.is_convicted && (
-                      <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/30 rounded px-2 py-0.5">
-                        Condenado
-                      </span>
-                    )}
-                    {fp.amount_usd && (
-                      <MoneyAmount amount={fp.amount_usd} className="text-sm" />
-                    )}
-                  </div>
-                </div>
-              )
-            ))}
+                ),
+            )}
           </div>
         </div>
       )}
@@ -321,7 +351,9 @@ export function FindingDetail() {
                   <div className="text-xs text-gray-600 mt-0.5">
                     {source.outlet && <span>{source.outlet}</span>}
                     {source.outlet && source.published_at && <span> · </span>}
-                    {source.published_at && <span>{formatDate(source.published_at)}</span>}
+                    {source.published_at && (
+                      <span>{formatDate(source.published_at)}</span>
+                    )}
                   </div>
                 </div>
               </li>
@@ -330,14 +362,15 @@ export function FindingDetail() {
         </div>
       )}
 
-
       {/* Comments */}
       <section>
         <h2 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-blue-400" />
           Comentarios
           {comments.length > 0 && (
-            <span className="text-sm font-normal text-gray-500">({comments.length})</span>
+            <span className="text-sm font-normal text-gray-500">
+              ({comments.length})
+            </span>
           )}
         </h2>
         <p className="text-xs text-gray-500 mb-5">
@@ -351,7 +384,7 @@ export function FindingDetail() {
             className="px-4 py-4 sm:bg-dark-800 sm:border sm:border-dark-700 sm:rounded-xl sm:p-5 space-y-3 mb-6"
           >
             <p className="text-xs text-gray-500">
-              Comentando como{' '}
+              Comentando como{" "}
               <span className="font-semibold text-gray-300">{displayName}</span>
               {user.email && (
                 <span className="text-gray-600"> · {user.email}</span>
@@ -367,7 +400,9 @@ export function FindingDetail() {
               className="bg-dark-700 border-dark-600 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 resize-none"
             />
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">{content.length}/2000</span>
+              <span className="text-xs text-gray-600">
+                {content.length}/2000
+              </span>
               <Button
                 type="submit"
                 disabled={addComment.isPending || !content.trim()}
@@ -375,16 +410,20 @@ export function FindingDetail() {
                 size="sm"
               >
                 <Send className="w-3.5 h-3.5" />
-                {addComment.isPending ? 'Enviando…' : 'Publicar'}
+                {addComment.isPending ? "Enviando…" : "Publicar"}
               </Button>
             </div>
             {addComment.isError && (
-              <p className="text-xs text-red-400">Error al publicar. Intenta de nuevo.</p>
+              <p className="text-xs text-red-400">
+                Error al publicar. Intenta de nuevo.
+              </p>
             )}
           </form>
         ) : (
           <div className="px-4 py-4 sm:bg-dark-800 sm:border sm:border-dark-700 sm:rounded-xl sm:p-5 mb-6 flex items-center justify-between gap-4">
-            <p className="text-sm text-gray-400">Inicia sesión para comentar.</p>
+            <p className="text-sm text-gray-400">
+              Inicia sesión para comentar.
+            </p>
             <Button
               onClick={openAuthModal}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white shrink-0"
@@ -400,17 +439,29 @@ export function FindingDetail() {
         {comments.length > 0 ? (
           <div className="divide-y divide-dark-700 sm:divide-y-0 sm:space-y-3">
             {[...comments]
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .sort(
+                (a, b) =>
+                  new Date(b.created_at).getTime() -
+                  new Date(a.created_at).getTime(),
+              )
               .map((c) => (
-                <div key={c.id} className="flex gap-3 px-4 py-3 sm:bg-dark-800 sm:border sm:border-dark-700 sm:rounded-xl sm:p-4">
+                <div
+                  key={c.id}
+                  className="flex gap-3 px-4 py-3 sm:bg-dark-800 sm:border sm:border-dark-700 sm:rounded-xl sm:p-4"
+                >
                   <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0 text-xs font-bold text-blue-300">
                     {getInitials(c.author_name)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-sm font-semibold text-white">{c.author_name}</span>
+                      <span className="text-sm font-semibold text-white">
+                        {c.author_name}
+                      </span>
                       <span className="text-xs text-gray-600">
-                        {formatDistanceToNow(new Date(c.created_at), { addSuffix: true, locale: es })}
+                        {formatDistanceToNow(new Date(c.created_at), {
+                          addSuffix: true,
+                          locale: es,
+                        })}
                       </span>
                     </div>
                     <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap break-words">

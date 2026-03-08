@@ -4,16 +4,18 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        'case-title': 'rgb(var(--color-case-title) / <alpha-value>)',
         dark: {
-          950: '#0a0a0f',
-          900: '#0f0f1a',
-          800: '#1a1a2e',
-          700: '#16213e',
-          600: '#1e2a4a',
-          500: '#243358',
+          950: 'rgb(var(--color-dark-950) / <alpha-value>)',
+          900: 'rgb(var(--color-dark-900) / <alpha-value>)',
+          800: 'rgb(var(--color-dark-800) / <alpha-value>)',
+          700: 'rgb(var(--color-dark-700) / <alpha-value>)',
+          600: 'rgb(var(--color-dark-600) / <alpha-value>)',
+          500: 'rgb(var(--color-dark-500) / <alpha-value>)',
         },
         severity: {
           critico: '#EF4444',

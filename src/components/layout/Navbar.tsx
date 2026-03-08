@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Menu, LogOut } from 'lucide-react';
+import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Menu, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { getInitials } from '../../lib/utils';
 import { NotificationBell } from './NotificationBell';
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,19 +22,37 @@ const navLinks = [
   { to: '/indice', label: 'Índice', icon: TrendingDown, exact: false },
 ];
 
+function ThemeToggleButton({ className = '' }: { className?: string }) {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button
+      onClick={toggleTheme}
+      className={`p-2 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-dark-700 ${className}`}
+      aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+    >
+      {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+    </button>
+  );
+}
+
 function UserMenu() {
   const { user, isLoading, signOut, openAuthModal } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   if (isLoading) return null;
 
   if (!user) {
     return (
-      <button
-        onClick={openAuthModal}
-        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors"
-      >
-        Iniciar sesión
-      </button>
+      <div className="flex items-center gap-1">
+        <ThemeToggleButton />
+        <button
+          onClick={openAuthModal}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors"
+        >
+          Iniciar sesión
+        </button>
+      </div>
     );
   }
 
@@ -60,6 +79,15 @@ function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-dark-600" />
         <DropdownMenuItem
+          onSelect={(e) => e.preventDefault()}
+          onClick={toggleTheme}
+          className="text-gray-400 hover:text-white focus:bg-dark-700 focus:text-white cursor-pointer gap-2"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-dark-600" />
+        <DropdownMenuItem
           onClick={signOut}
           className="text-gray-400 hover:text-white focus:bg-dark-700 focus:text-white cursor-pointer gap-2"
         >
@@ -73,6 +101,7 @@ function UserMenu() {
 
 export function Navbar() {
   const { user, isLoading, openAuthModal, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
@@ -85,7 +114,7 @@ export function Navbar() {
               <Scale className="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <span className="font-bold text-white text-sm tracking-tight">PTY</span>
+              <span className="font-bold text-sm tracking-tight">PTY</span>
               <span className="font-bold text-red-400 text-sm tracking-tight ml-0.5">Corrupción</span>
             </div>
           </Link>
@@ -149,8 +178,15 @@ export function Navbar() {
                       </NavLink>
                     ))}
                   </nav>
-                  {/* Auth item */}
-                  <div className="p-3 border-t border-dark-700">
+                  {/* Theme toggle + Auth */}
+                  <div className="p-3 border-t border-dark-700 flex flex-col gap-2">
+                    <button
+                      onClick={toggleTheme}
+                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-dark-700 transition-colors"
+                    >
+                      {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                      {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                    </button>
                     {!isLoading && (
                       user ? (
                         <button

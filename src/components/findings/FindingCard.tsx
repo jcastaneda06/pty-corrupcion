@@ -81,7 +81,7 @@ export function FindingCard({ finding }: Props) {
         style={{ borderLeftColor: SEVERITY_COLORS[finding.severity], borderLeftWidth: 3 }}
       >
         <div className="flex items-start justify-between gap-3 mb-3">
-          <h3 className="font-semibold text-white text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2 md:min-h-[2.5rem]">
+          <h3 className="font-semibold text-case-title text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2 md:min-h-[2.5rem]">
             {finding.title}
           </h3>
           <SeverityBadge severity={finding.severity} size="sm" />
