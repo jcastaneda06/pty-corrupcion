@@ -21,6 +21,7 @@ export function AuthModal() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [signedUp, setSignedUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,11 +29,16 @@ export function AuthModal() {
   const switchMode = (next: 'login' | 'signup') => {
     setMode(next);
     setErrorMsg('');
+    setConfirmPassword('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    if (mode === 'signup' && password !== confirmPassword) {
+      setErrorMsg('Las contraseñas no coinciden.');
+      return;
+    }
     setIsLoading(true);
     if (mode === 'login') {
       const { error } = await signIn(email, password);
@@ -114,6 +120,21 @@ export function AuthModal() {
                   className="bg-dark-700 border-dark-600 text-white placeholder:text-gray-500 focus-visible:ring-blue-500"
                 />
               </div>
+              {mode === 'signup' && (
+                <div className="space-y-1">
+                  <Label htmlFor="auth-confirm-password" className="sr-only">Confirmar contraseña</Label>
+                  <Input
+                    id="auth-confirm-password"
+                    type="password"
+                    placeholder="Confirmar contraseña"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="bg-dark-700 border-dark-600 text-white placeholder:text-gray-500 focus-visible:ring-blue-500"
+                  />
+                </div>
+              )}
               {errorMsg && <p className="text-xs text-red-400">{errorMsg}</p>}
               <Button
                 type="submit"

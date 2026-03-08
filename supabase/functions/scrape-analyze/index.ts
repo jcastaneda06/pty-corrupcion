@@ -41,8 +41,6 @@ const SEARCH_QUERIES = [
   "discriminacion sexual panama",
   "discriminacion de género panama",
   "discriminacion de orientación sexual panama",
-  "discriminacion de identidad de género panama",
-  "discriminacion de expresión panama",
   "discriminacion de religión panama",
 
   // Financial corruption
@@ -60,49 +58,28 @@ const SEARCH_QUERIES = [
   "desfalco panama",
   "fraude en contratacion panama",
   "electricidad panama fraude",
-  "electricidad panama soborno",
-  "electricidad panama malversacion",
-  "electricidad panama lavado de dinero",
-  "electricidad panama fraude en contratacion",
-  "electricidad panama soborno",
-  "electricidad panama malversacion",
-  "electricidad panama lavado de dinero",
-  "telefonia panama fraude",
-  "telefonia panama soborno",
-  "telefonia panama malversacion",
-  "telefonia panama lavado de dinero",
-  "telefonia panama fraude en contratacion",
-  "telefonia panama soborno",
-  "telefonia panama malversacion",
-  "telefonia panama lavado de dinero",
   "mas movil panama estafa",
   "tigo panama estafa",
   "costo de vida",
   "precio de la gasolina",
   "precio de vivienda",
+  "precio de la electricidad",
+  "precio de la agua",
+  "precio de la telefonia",
+  "precio de la internet",
+  "precio de la gasolina",
 
   // Government & political
   "funcionario imputado panama",
   "MOP panama contrato",
   "asamblea nacional panama escandalo",
   "juicio corrupcion panama",
-  "ministro detenido panama",
   "alcalde panama corrupcion",
   "diputado panama investigado",
   "presidente panama corrupcion",
   "vicepresidente panama corrupcion",
   "ministro panama corrupcion",
   "alcalde panama corrupcion",
-  "expresidente panama corrupcion",
-  "exvicepresidente panama corrupcion",
-  "exministro panama corrupcion",
-  "exalcalde panama corrupcion",
-  "exdiputado panama corrupcion",
-  "exfuncionario panama corrupcion",
-  "expresidente panama corrupcion",
-  "exvicepresidente panama corrupcion",
-  "exministro panama corrupcion",
-  "exalcalde panama corrupcion",
 
   // Environment & extractive
   "mineria ilegal panama",
@@ -137,10 +114,6 @@ const SEARCH_QUERIES = [
   "Panama corruption in public international agreement",
   "Panama corruption in public international convention",
   "Panama corruption in public international protocol",
-  "Panama corruption in public international resolution",
-  "Panama corruption in public international declaration",
-  "Panama corruption in public international resolution",
-  "Panama corruption in public international declaration",
   "Panama corruption in public international resolution",
   "Panama corruption in public international declaration",
 ];
@@ -1028,16 +1001,26 @@ Deno.serve(async (req: Request) => {
       const moneyQueue: RssItem[] = [];
       for (const items of moneyFeedResults) {
         for (const item of items) {
-          if (!item.url || processedUrls.has(item.url) || knownUrls.has(item.url)) continue;
+          if (
+            !item.url ||
+            processedUrls.has(item.url) ||
+            knownUrls.has(item.url)
+          )
+            continue;
           processedUrls.add(item.url);
           moneyQueue.push(item);
         }
       }
-      console.log(`Supplemental pass: ${moneyQueue.length} new money-related articles`);
+      console.log(
+        `Supplemental pass: ${moneyQueue.length} new money-related articles`,
+      );
 
       if (moneyQueue.length > 0) {
         const moneyRelevant = await preScreenArticles(geminiKey, moneyQueue);
-        const moneyGroups = await clusterItemsIntoGroups(geminiKey, moneyRelevant);
+        const moneyGroups = await clusterItemsIntoGroups(
+          geminiKey,
+          moneyRelevant,
+        );
 
         for (const group of moneyGroups) {
           if (moneyFindingsCreated >= 2) break;
@@ -1047,7 +1030,12 @@ Deno.serve(async (req: Request) => {
             `  [money pass] Processing group (${group.length} article${group.length > 1 ? "s" : ""}): ${group[0].title || group[0].url}`,
           );
           const content = resolveGroupContent(group);
-          const result = await processArticle(supabase, geminiKey, group, content);
+          const result = await processArticle(
+            supabase,
+            geminiKey,
+            group,
+            content,
+          );
           if (result !== false) {
             findingsCreated++;
             if (MONEY_CATEGORIES.has(result)) moneyFindingsCreated++;
