@@ -48,7 +48,7 @@ export function Apoyanos() {
       </div>
 
       {/* About the project */}
-      <section className="bg-dark-800 border border-dark-600 rounded-xl p-6 space-y-4">
+      <section className="px-4 py-4 sm:bg-dark-800 sm:border sm:border-dark-600 sm:rounded-xl sm:p-6 space-y-4">
         <h2 className="text-lg font-semibold text-white">¿Qué es PTY Corrupción?</h2>
         <p className="text-gray-300 text-sm leading-relaxed">
           <strong className="text-white">PTY Corrupción</strong> es un panel de monitoreo de
@@ -65,7 +65,7 @@ export function Apoyanos() {
       </section>
 
       {/* Motivation */}
-      <section className="bg-dark-800 border border-dark-600 rounded-xl p-6 space-y-4">
+      <section className="px-4 py-4 sm:bg-dark-800 sm:border sm:border-dark-600 sm:rounded-xl sm:p-6 space-y-4">
         <h2 className="text-lg font-semibold text-white">¿Por qué lo hice?</h2>
         <p className="text-gray-300 text-sm leading-relaxed">
           Soy un desarrollador panameño frustrado con la impunidad y la falta de herramientas
