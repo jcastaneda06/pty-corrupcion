@@ -9,7 +9,8 @@
       "Bash(grep:*)",
       "WebFetch(domain:ui.shadcn.com)",
       "Bash(npm:*)",
-      "Bash(npx shadcn@latest:*)"
+      "Bash(npx shadcn@latest:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

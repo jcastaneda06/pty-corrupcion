@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { UserRoundCheck, Filter, ExternalLink } from 'lucide-react';
+import { UserRoundCheck, ExternalLink, ArrowLeft } from 'lucide-react';
 import { MarkDuplicateButton } from '../components/duplicates/MarkDuplicateButton';
 import { useListPoliticians, usePoliticianTimeline } from '../hooks/usePoliticians';
 import { PoliticianFilters } from '../components/politicians/PoliticianFilters';
 import { SeverityBadge } from '../components/app/SeverityBadge';
 import { MoneyAmount } from '../components/app/MoneyAmount';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { type PoliticianFilters as PoliticianFiltersType, type Politician, type FindingPerson } from '../types';
 import { getInitials, formatDate, formatMoney, SEVERITY_COLORS } from '../lib/utils';
@@ -39,7 +37,6 @@ function PoliticianItem({ politician, selected, onClick }: PoliticianItemProps) 
           : 'border-transparent hover:bg-dark-800'
       )}
     >
-      {/* Avatar */}
       {politician.photo_url ? (
         <img
           src={politician.photo_url}
@@ -76,9 +73,10 @@ interface PoliticianDetailProps {
   politician: Politician;
   timeline: FindingPerson[];
   timelineLoading: boolean;
+  onBack?: () => void;
 }
 
-function PoliticianDetail({ politician, timeline, timelineLoading }: PoliticianDetailProps) {
+function PoliticianDetail({ politician, timeline, timelineLoading, onBack }: PoliticianDetailProps) {
   const name = politician.person?.name ?? '';
   const count = politician.finding_count ?? 0;
   const totalAmount = timeline.reduce((sum, fp) => sum + (fp.amount_usd ?? fp.finding?.amount_usd ?? 0), 0);
@@ -93,10 +91,20 @@ function PoliticianDetail({ politician, timeline, timelineLoading }: PoliticianD
 
   return (
     <div className="p-4 md:p-6 space-y-6">
+      {/* Mobile back button */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="md:hidden flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors -mt-1 mb-1"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Políticos
+        </button>
+      )}
+
       {/* Header card */}
       <div className="bg-dark-800 rounded-xl p-5 border border-dark-700">
         <div className="flex items-start gap-4">
-          {/* Avatar */}
           <div className="flex-shrink-0">
             {politician.photo_url ? (
               <img
@@ -122,7 +130,6 @@ function PoliticianDetail({ politician, timeline, timelineLoading }: PoliticianD
             )}
           </div>
 
-          {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 flex-wrap">
               <div>
@@ -155,11 +162,9 @@ function PoliticianDetail({ politician, timeline, timelineLoading }: PoliticianD
         </div>
 
         {politician.person?.bio && (
-          <>
-            <div className="border-t border-dark-700 mt-4 pt-4">
-              <p className="text-sm text-gray-400 leading-relaxed">{politician.person.bio}</p>
-            </div>
-          </>
+          <div className="border-t border-dark-700 mt-4 pt-4">
+            <p className="text-sm text-gray-400 leading-relaxed">{politician.person.bio}</p>
+          </div>
         )}
       </div>
 
@@ -185,9 +190,7 @@ function PoliticianDetail({ politician, timeline, timelineLoading }: PoliticianD
           <p className="text-gray-500 text-sm">No hay casos registrados.</p>
         ) : (
           <div className="relative pl-4">
-            {/* Vertical line */}
             <div className="absolute left-1.5 top-2 bottom-2 w-px bg-dark-700" />
-
             <div className="space-y-3">
               {timeline.map((fp) => {
                 const finding = fp.finding;
@@ -197,12 +200,10 @@ function PoliticianDetail({ politician, timeline, timelineLoading }: PoliticianD
 
                 return (
                   <div key={fp.id} className="relative flex gap-3">
-                    {/* Dot */}
                     <div
                       className="absolute -left-1 top-3 w-3 h-3 rounded-full border-2 border-dark-900 flex-shrink-0"
                       style={{ backgroundColor: severityColor }}
                     />
-
                     <div className="ml-4 flex-1">
                       {date && (
                         <p className="text-xs text-gray-600 mb-1">{formatDate(date)}</p>
@@ -253,21 +254,7 @@ function PoliticianDetail({ politician, timeline, timelineLoading }: PoliticianD
   );
 }
 
-function EmptyState() {
-  return (
-    <div className="flex items-center justify-center h-full min-h-[300px] text-center px-6">
-      <div>
-        <UserRoundCheck className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-        <p className="text-gray-500 font-medium">Selecciona un político</p>
-        <p className="text-gray-600 text-sm mt-1">
-          Elige un político de la lista para ver su historial de casos
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function SidebarContent({
+function ListPanel({
   filters,
   onFiltersChange,
   politicians,
@@ -326,7 +313,6 @@ function SidebarContent({
 
 export function Politicos() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [filters, setFilters] = useState<PoliticianFiltersType>({
     search: searchParams.get('search') || '',
@@ -354,16 +340,25 @@ export function Politicos() {
 
   const selectedPolitician = politicians.find((p) => p.person_id === selectedPersonId) ?? null;
 
-  const handleSelect = (personId: string) => {
-    setSelectedPersonId(personId);
-    setMobileOpen(false);
-  };
+  const handleSelect = (personId: string) => setSelectedPersonId(personId);
+  const handleBack = () => setSelectedPersonId(null);
 
+  // Mobile: two-screen flow — list OR detail
+  // Desktop: sidebar + main split
   return (
     <div className="max-w-7xl mx-auto md:flex md:h-[calc(100vh-3.5rem)]">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex md:w-72 md:flex-shrink-0 md:border-r md:border-dark-700 md:flex-col md:overflow-hidden">
-        <SidebarContent
+
+      {/* Sidebar — always visible on desktop; hidden on mobile when detail is open */}
+      <aside
+        className={cn(
+          'md:flex md:w-72 md:flex-shrink-0 md:border-r md:border-dark-700 md:flex-col md:overflow-hidden',
+          // Mobile: fill full screen when no politician selected, hide when one is
+          selectedPersonId
+            ? 'hidden md:flex'
+            : 'flex flex-col h-[calc(100vh-3.5rem)]'
+        )}
+      >
+        <ListPanel
           filters={filters}
           onFiltersChange={setFilters}
           politicians={politicians}
@@ -373,47 +368,28 @@ export function Politicos() {
         />
       </aside>
 
-      {/* Mobile header + sheet */}
-      <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b border-dark-700">
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 border-dark-600 text-gray-400 hover:text-white"
-            >
-              <Filter className="w-4 h-4" />
-              Políticos
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-72 bg-dark-900 border-dark-700 p-0">
-            <SidebarContent
-              filters={filters}
-              onFiltersChange={setFilters}
-              politicians={politicians}
-              isLoading={isLoading}
-              selectedPersonId={selectedPersonId}
-              onSelect={handleSelect}
-            />
-          </SheetContent>
-        </Sheet>
-        {selectedPolitician && (
-          <span className="text-sm font-medium text-white truncate">
-            {selectedPolitician.person?.name}
-          </span>
+      {/* Detail panel — hidden on mobile when no politician selected */}
+      <main
+        className={cn(
+          'flex-1 md:overflow-y-auto',
+          !selectedPersonId && 'hidden md:flex md:items-center md:justify-center'
         )}
-      </div>
-
-      {/* Main content */}
-      <main className="flex-1 md:overflow-y-auto">
+      >
         {selectedPolitician ? (
           <PoliticianDetail
             politician={selectedPolitician}
             timeline={timeline}
             timelineLoading={timelineLoading}
+            onBack={handleBack}
           />
         ) : (
-          <EmptyState />
+          <div className="text-center px-6">
+            <UserRoundCheck className="w-12 h-12 text-gray-700 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">Selecciona un político</p>
+            <p className="text-gray-600 text-sm mt-1">
+              Elige un político de la lista para ver su historial de casos
+            </p>
+          </div>
         )}
       </main>
     </div>

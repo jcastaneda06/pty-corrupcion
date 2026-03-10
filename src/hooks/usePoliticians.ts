@@ -5,7 +5,7 @@ import { type Politician, type PoliticianFilters, type FindingPerson } from "../
 async function fetchPoliticians(filters: PoliticianFilters = {}): Promise<Politician[]> {
   let query = supabase
     .from("politicians")
-    .select("*, person:people(*)")
+    .select("*, person:people!person_id(*)")
     .not("political_position", "is", null);
 
   if (filters.position) {
