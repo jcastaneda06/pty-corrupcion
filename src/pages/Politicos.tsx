@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { UserRoundCheck, Filter, ExternalLink } from 'lucide-react';
+import { MarkDuplicateButton } from '../components/duplicates/MarkDuplicateButton';
 import { useListPoliticians, usePoliticianTimeline } from '../hooks/usePoliticians';
 import { PoliticianFilters } from '../components/politicians/PoliticianFilters';
 import { SeverityBadge } from '../components/app/SeverityBadge';
@@ -56,12 +57,17 @@ function PoliticianItem({ politician, selected, onClick }: PoliticianItemProps) 
         <p className="text-xs text-gray-500 truncate">{politician.political_position}</p>
       </div>
 
-      <Badge
-        variant="outline"
-        className={cn('text-xs px-1.5 py-0.5 font-semibold flex-shrink-0', getCountBadgeColor(count))}
-      >
-        {count}
-      </Badge>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <Badge
+          variant="outline"
+          className={cn('text-xs px-1.5 py-0.5 font-semibold', getCountBadgeColor(count))}
+        >
+          {count}
+        </Badge>
+        <span onClick={(e) => e.stopPropagation()}>
+          <MarkDuplicateButton type="person" subject={politician} />
+        </span>
+      </div>
     </button>
   );
 }

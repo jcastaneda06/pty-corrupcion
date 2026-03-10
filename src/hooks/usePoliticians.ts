@@ -5,17 +5,9 @@ import { type Politician, type PoliticianFilters, type FindingPerson } from "../
 async function fetchPoliticians(filters: PoliticianFilters = {}): Promise<Politician[]> {
   let query = supabase
     .from("politicians")
-    .select(`
-      *,
-      person:people(*),
-      finding_count:finding_people(count)
-    `)
-    .eq("is_processed", true)
+    .select("*, person:people(*)")
     .not("political_position", "is", null);
 
-  if (filters.search) {
-    query = query.ilike("person.name", `%${filters.search}%`);
-  }
   if (filters.position) {
     query = query.ilike("political_position", `%${filters.position}%`);
   }
@@ -29,10 +21,29 @@ async function fetchPoliticians(filters: PoliticianFilters = {}): Promise<Politi
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw error;
 
-  return (data ?? []).map((row) => ({
-    ...row,
-    finding_count: (row.finding_count as { count: number }[])?.[0]?.count ?? 0,
-  })) as Politician[];
+  let rows = (data ?? []) as Politician[];
+
+  // Search filter applied client-side since PostgREST can't filter on embedded columns
+  if (filters.search) {
+    const term = filters.search.toLowerCase();
+    rows = rows.filter((p) => p.person?.name?.toLowerCase().includes(term));
+  }
+
+  if (rows.length === 0) return [];
+
+  // Fetch finding counts for all returned politicians via finding_people.person_id
+  const personIds = rows.map((p) => p.person_id);
+  const { data: fpRows } = await supabase
+    .from("finding_people")
+    .select("person_id")
+    .in("person_id", personIds);
+
+  const countMap: Record<string, number> = {};
+  for (const row of fpRows ?? []) {
+    countMap[row.person_id] = (countMap[row.person_id] ?? 0) + 1;
+  }
+
+  return rows.map((p) => ({ ...p, finding_count: countMap[p.person_id] ?? 0 }));
 }
 
 async function fetchPoliticianTimeline(personId: string): Promise<FindingPerson[]> {

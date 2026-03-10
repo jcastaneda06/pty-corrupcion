@@ -32,10 +32,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+
+      if (event === 'SIGNED_IN') {
+        const returnTo = sessionStorage.getItem('auth_return_to');
+        if (returnTo) {
+          sessionStorage.removeItem('auth_return_to');
+          if (returnTo !== window.location.pathname) {
+            window.location.replace(returnTo);
+          }
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -52,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    sessionStorage.setItem('auth_return_to', window.location.pathname + window.location.search);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },

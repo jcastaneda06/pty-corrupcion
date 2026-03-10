@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Scale, LayoutDashboard, FileText, TrendingDown, BarChart2, Heart, UserRoundCheck, Menu, LogOut, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, FileText, TrendingDown, BarChart2, Heart, UserRoundCheck, Menu, LogOut, Sun, Moon } from 'lucide-react';
+import logoLight from '../../assets/logo-light.svg';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getInitials } from '../../lib/utils';
@@ -112,9 +113,7 @@ export function Navbar() {
         <div className="flex h-14 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 bg-red-500/20 border border-red-500/40 rounded-lg flex items-center justify-center group-hover:bg-red-500/30 transition-colors">
-              <Scale className="w-4 h-4 text-red-400" />
-            </div>
+            <img src={logoLight} alt="PTY Corrupción" className="w-8 h-8" />
             <div>
               <span className="font-bold text-sm tracking-tight">PTY</span>
               <span className="font-bold text-red-400 text-sm tracking-tight ml-0.5">Corrupción</span>
@@ -160,9 +159,7 @@ export function Navbar() {
               <SheetContent side="right" className="bg-dark-900 border-dark-700 w-64 p-0">
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-2.5 p-4 border-b border-dark-700">
-                    <div className="w-7 h-7 bg-red-500/20 border border-red-500/40 rounded-lg flex items-center justify-center">
-                      <Scale className="w-3.5 h-3.5 text-red-400" />
-                    </div>
+                    <img src={logoLight} alt="PTY Corrupción" className="w-7 h-7" />
                     <span className="font-bold text-sm">PTY<span className="text-red-400">Corrupción</span></span>
                   </div>
                   <nav className="flex flex-col gap-1 p-3 flex-1">

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, ChevronRight, Plus, Users } from 'lucide-react';
 import { type Finding, type Reaction } from '../../types';
+import { MarkDuplicateButton } from '@/components/duplicates/MarkDuplicateButton';
 import { SeverityBadge } from '@/components/app/SeverityBadge';
 import { EmojiPickerPortal } from '@/components/app/EmojiPickerPortal';
 
@@ -118,7 +119,10 @@ export function FindingCard({ finding }: Props) {
           <span className="text-xs text-gray-600 bg-dark-700 px-2 py-0.5 rounded">
             {finding.category}
           </span>
-          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-blue-400 transition-colors" />
+          <div className="flex items-center gap-1.5">
+            <MarkDuplicateButton type="finding" subject={finding} />
+            <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-blue-400 transition-colors" />
+          </div>
         </div>
 
         {/* Reactions — Discord style */}

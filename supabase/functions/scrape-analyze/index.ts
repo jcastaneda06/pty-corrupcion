@@ -1062,12 +1062,6 @@ Deno.serve(async (req: Request) => {
     duration_ms: duration,
   });
 
-  // Fire-and-forget — classify + enrich new public figures as politicians
-  fetch(`${supabaseUrl}/functions/v1/corrupt-politician`, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
-  }).catch(() => {});
-
   return new Response(
     JSON.stringify({
       success: !lastError,

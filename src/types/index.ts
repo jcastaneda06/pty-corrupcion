@@ -152,3 +152,12 @@ export interface PoliticianFilters {
   dateFrom?: string;
   dateTo?: string;
 }
+
+export interface DuplicateMerge {
+  id: string;
+  type: 'finding' | 'person';
+  winner_id: string;
+  loser_id: string;
+  merged_by: string | null;
+  merged_at: string;
+}
