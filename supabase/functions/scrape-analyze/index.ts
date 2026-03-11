@@ -17,105 +17,57 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // a run are filtered by the in-memory processedUrls Set.
 
 const SEARCH_QUERIES = [
-  // Social / human rights (prioritized — processed first before timeout)
+  // Social / human rights
   "SENNIAF panama",
   "abuso menores hogares panama",
+  "hogar ninos panama muerte",
   "negligencia hospital panama",
   "CSS panama corrupcion",
   "MINSA panama irregularidades",
+  "MEDUCA panama corrupcion",
   "presos hacinamiento panama carcel",
   "abuso policial panama",
   "migrantes derechos humanos panama",
   "adultos mayores abandono panama",
-  "hogar ninos panama muerte",
-  "protestas en panama",
-  "muerte de manifestantes panama",
-  "abuso policial panama",
-  "violacion de derechos humanos panama",
-  "MEDUCA panama corrupcion",
-  "racismo panama",
-  "discriminacion panama",
-  "homofobia panama",
-  "transfobia panama",
-  "discriminacion racial panama",
-  "discriminacion sexual panama",
-  "discriminacion de género panama",
-  "discriminacion de orientación sexual panama",
-  "discriminacion de religión panama",
+  "protestas represion panama",
+  "discriminacion derechos humanos panama",
 
   // Financial corruption
   "corrupcion panama",
-  "peculado panama",
+  "peculado malversacion panama",
   "soborno funcionario panama",
-  "malversacion fondos publicos panama",
   "lavado dinero panama",
+  "desfalco fraude panama",
   "fiscalia anticorrupcion panama",
   "contraloria panama irregularidades",
-  "licitacion irregular panama",
-  "contratos publicos panama fraude",
-  "trafico influencias panama",
-  "enriquecimiento ilicito panama",
-  "desfalco panama",
-  "fraude en contratacion panama",
-  "electricidad panama fraude",
-  "mas movil panama estafa",
-  "tigo panama estafa",
-  "costo de vida",
-  "precio de la gasolina",
-  "precio de vivienda",
-  "precio de la electricidad",
-  "precio de la agua",
-  "precio de la telefonia",
-  "precio de la internet",
-  "precio de la gasolina",
+  "licitacion contratos publicos panama fraude",
+  "trafico influencias enriquecimiento ilicito panama",
+  "empresas servicios publicos panama estafa",
+  "precios abusivos tarifas irregulares panama",
 
   // Government & political
   "funcionario imputado panama",
-  "MOP panama contrato",
-  "asamblea nacional panama escandalo",
   "juicio corrupcion panama",
-  "alcalde panama corrupcion",
-  "diputado panama investigado",
-  "presidente panama corrupcion",
-  "vicepresidente panama corrupcion",
-  "ministro panama corrupcion",
-  "alcalde panama corrupcion",
+  "alcalde diputado panama investigado",
+  "ministro presidente panama corrupcion",
+  "MOP asamblea nacional panama escandalo",
 
   // Environment & extractive
   "mineria ilegal panama",
-  "tala ilegal panama funcionarios",
-  "concesion irregular panama",
+  "tala ilegal concesion irregular panama",
   "corrupcion canal de panama",
 
-  // English queries (picks up InSight Crime, Newsroom Panama, international press)
-  "Panama corruption scandal",
+  // English (InSight Crime, Newsroom Panama, international press)
+  "Panama corruption scandal indictment",
   "Panama government officials arrested",
   "Panama human rights violations",
-  "Panama public funds misuse",
-  "Panama bribery indictment",
-  "Panama social services abuse",
-  "Panama corruption in construction",
-  "Panama corruption in public procurement",
-  "Panama corruption in public services",
-  "Panama corruption in public transport",
-  "Panama corruption in public health",
-  "Panama corruption in public education",
-  "Panama corruption in public security",
-  "Panama corruption in public environment",
-  "Panama corruption in public justice",
-  "Panama corruption in public finance",
-  "Panama corruption in public administration",
-  "Panama corruption in public international relations",
-  "Panama corruption in public international cooperation",
-  "Panama corruption in public international trade",
-  "Panama corruption in public international law",
-  "Panama corruption in public international organization",
-  "Panama corruption in public international treaty",
-  "Panama corruption in public international agreement",
-  "Panama corruption in public international convention",
-  "Panama corruption in public international protocol",
-  "Panama corruption in public international resolution",
-  "Panama corruption in public international declaration",
+  "Panama public funds misuse embezzlement",
+  "Panama bribery money laundering",
+  "Panama social services abuse children elderly",
+  "Panama public procurement fraud",
+  "Panama environmental crime corruption",
+  "Panama health education corruption",
+  "Panama justice system corruption",
 ];
 
 // ── Financial / money-corruption categories ───────────────────────────────────
@@ -160,17 +112,35 @@ function googleNewsRssUrl(query: string, timeAppend = ""): string {
   return `https://news.google.com/rss/search?q=${encoded}&hl=es-419&gl=PA&ceid=PA:es-419`;
 }
 
-// Compute a dynamic archive date range: 2 years ago → 1 year ago (Panama UTC-5).
-// Refreshes every run so the window keeps advancing.
+// Rotating 6-month archive window (Panama UTC-5).
+// Divides the full history (2000-01-01 → 3 years ago) into 6-month slices and
+// rotates through them using the current week number. Stateless — no DB needed.
+// With ~46 six-month periods (2000–2023), the full range cycles in ~46 weeks.
 function archiveDateFilter(): string {
   const nowPanamaMs = Date.now() - 5 * 60 * 60 * 1000;
   const now = new Date(nowPanamaMs);
+
   const threeYearsAgo = new Date(now);
   threeYearsAgo.setFullYear(now.getFullYear() - 3);
+
   const fmt = (d: Date) => d.toISOString().split("T")[0];
-  // Fixed start of 2000 so the window covers major historical cases:
-  // Torrijos (2004–2009), Panama Papers (2016), Martinelli (2014+), etc.
-  return `after:2000-01-01 before:${fmt(threeYearsAgo)}`;
+
+  // Build all 6-month periods from Jan 2000 up to (exclusive) 3 years ago
+  const periods: Array<[Date, Date]> = [];
+  const cursor = new Date("2000-01-01T00:00:00Z");
+  while (cursor < threeYearsAgo) {
+    const start = new Date(cursor);
+    const end = new Date(cursor);
+    end.setMonth(end.getMonth() + 6);
+    if (end > threeYearsAgo) end.setTime(threeYearsAgo.getTime());
+    periods.push([start, end]);
+    cursor.setMonth(cursor.getMonth() + 6);
+  }
+
+  // Rotate weekly, newest slice first: week 0 = just before 3 years ago, week 1 = 6 months earlier, etc.
+  const weekNumber = Math.floor(nowPanamaMs / (7 * 24 * 60 * 60 * 1000));
+  const [start, end] = periods[periods.length - 1 - (weekNumber % periods.length)];
+  return `after:${fmt(start)} before:${fmt(end)}`;
 }
 
 // ── Helper: verify a URL returns a 2xx response ───────────────────────────────
@@ -879,7 +849,7 @@ Deno.serve(async (req: Request) => {
     // archive window (2 years ago → 1 year ago) so each run covers both fresh
     // news AND older cases that haven't been ingested yet.
     const archiveFilter = archiveDateFilter();
-    const midpoint = Math.ceil(SEARCH_QUERIES.length / 2);
+    const midpoint = Math.ceil(SEARCH_QUERIES.length * 0.4);
     const allFeeds = SEARCH_QUERIES.map((q, i) => {
       const timeAppend = i < midpoint ? "when:30d" : archiveFilter;
       return {
@@ -896,17 +866,22 @@ Deno.serve(async (req: Request) => {
     );
     console.log(`RSS fetch complete. Deduplicating…`);
 
-    // Step 2: flatten + deduplicate by URL (in-memory, within this run)
+    // Step 2: flatten + deduplicate — recent items first, archive items after
     const processedUrls = new Set<string>();
-    const queue: RssItem[] = [];
-    for (const items of feedResults) {
-      for (const item of items) {
+    const recentItems: RssItem[] = [];
+    const archiveItems: RssItem[] = [];
+    for (let idx = 0; idx < feedResults.length; idx++) {
+      const bucket = idx < midpoint ? recentItems : archiveItems;
+      for (const item of feedResults[idx]) {
         if (!item.url || processedUrls.has(item.url)) continue;
         processedUrls.add(item.url);
-        queue.push(item);
+        bucket.push(item);
       }
     }
-    console.log(`${queue.length} unique articles fetched`);
+    const queue: RssItem[] = [...recentItems, ...archiveItems];
+    console.log(
+      `${queue.length} unique articles (${recentItems.length} recent + ${archiveItems.length} archive)`,
+    );
 
     // Step 3: filter out articles already stored in the sources table
     const knownUrls = await loadKnownUrls(supabase);

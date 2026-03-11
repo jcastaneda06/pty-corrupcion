@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev        # start Vite dev server
 npm run build      # tsc + vite build
-npm run lint       # ESLint (zero warnings allowed)
+npm run lint       # ESLint (zero warnings allowed) — currently fails due to missing ESLint config; use npm run build to validate TypeScript instead
 npm run preview    # preview production build
 
 # Supabase edge functions
@@ -34,11 +34,12 @@ The `GEMINI_API_KEY` used by edge functions must be set as a Supabase secret, no
 **PTY Corrupción** is a Panama corruption tracking dashboard. It has two distinct layers:
 
 ### Frontend (React SPA)
-- `src/App.tsx` — router + React Query provider; routes: `/`, `/hallazgos`, `/hallazgos/:id`, `/personas/:id`, `/indice`
+- `src/App.tsx` — router + React Query provider; routes: `/`, `/hallazgos`, `/hallazgos/:id`, `/personas/:id`, `/indice`, `/estadisticas`, `/politicos`, `/apoyanos`
 - `src/types/index.ts` — all TypeScript types (`Finding`, `Person`, `FindingPerson`, `PersonRelationship`, `Source`, `ScrapeLog`)
 - `src/lib/supabase.ts` — single Supabase client, reads from `VITE_SUPABASE_*` env vars
-- `src/hooks/` — React Query hooks (`useFindings`, `useDashboardStats`, `useFinding`) that query Supabase directly from the browser using the anon key (RLS enforces read-only public access)
-- `src/pages/` — full-page components; `Dashboard` shows stats/charts, `Findings` is the filterable list, `FindingDetail` + `PersonDetail` show individual records, `CorruptionIndex` shows recharts visualizations
+- `src/contexts/AuthContext.tsx` — Supabase Auth state; provides `useAuth()` with `user`, `session`, `isLoading`, `isAuthModalOpen`, `signIn`, `signUp`, `signInWithGoogle`, `signOut`, `openAuthModal`, `closeAuthModal`; also detects admin role
+- `src/hooks/` — React Query hooks that query Supabase directly via the anon key (RLS enforces public read-only access): `useFindings`, `useFinding`, `useDashboardStats`, `useFindingComments`, `useComments`, `usePoliticians`, `useDuplicateSearch`, `useNotifications`
+- `src/pages/` — `Dashboard` (stats/charts), `Findings` (filterable list), `FindingDetail`, `PersonDetail`, `CorruptionIndex` (recharts), `Estadisticas`, `Politicos` (admin editable/deletable), `Apoyanos`
 - `src/components/findings/RelationshipMap.tsx` — uses `@xyflow/react` to render person relationship graphs
 
 ### Backend (Supabase)
@@ -49,8 +50,10 @@ The `GEMINI_API_KEY` used by edge functions must be set as a Supabase secret, no
 - `person_relationships` — graph edges between people (`familiar`, `socio_comercial`, `politico`, `empleado`, `otro`)
 - `sources` — news article URLs per finding
 - `scrape_log` — audit log of each automated scrape run
+- `finding_comments` — user comments on findings (requires auth, `user_id NOT NULL references auth.users`)
+- `reactions` — emoji reactions on findings (requires auth; toggle: clicking own reaction removes it)
 
-All tables have RLS enabled with public read-only policies. Writes require the service role key.
+All tables have RLS enabled. Public tables are read-only via anon key. Comments and reactions require auth. Writes to other tables require the service role key.
 
 **Edge Functions** (Deno, in `supabase/functions/`):
 - `scrape-analyze` — the core automation pipeline, triggered daily by pg_cron:
@@ -62,6 +65,8 @@ All tables have RLS enabled with public read-only policies. Writes require the s
   6. Inserts findings, sources, people, and relationships into Supabase
   7. Logs each run to `scrape_log`
 - `backfill-source-titles` — utility that fills null `title` fields in the `sources` table by fetching HTML page titles
+- `merge-duplicate` — edge function version of the duplicate-merging logic
+- `corrupt-politician` — targeted scraping for a specific politician by name; uses deduplication and identity filtering to prevent duplicate DB entries; accepts `name` param in request body
 
 **Utility Script** (`scripts/merge-duplicate-findings.mjs`):
 - Uses Claude (Anthropic API, `claude-opus-4-6`) to cluster existing findings by topic and merge duplicates — picks winner by highest severity, reassigns sources/people, generates consolidated summary, deletes losers
