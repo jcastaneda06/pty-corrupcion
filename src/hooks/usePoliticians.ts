@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { type Politician, type PoliticianFilters, type FindingPerson } from "../types";
 
@@ -6,7 +6,8 @@ async function fetchPoliticians(filters: PoliticianFilters = {}): Promise<Politi
   let query = supabase
     .from("politicians")
     .select("*, person:people!person_id(*)")
-    .not("political_position", "is", null);
+    .not("political_position", "is", null)
+    .is("deleted_at", null);
 
   if (filters.position) {
     query = query.ilike("political_position", `%${filters.position}%`);
@@ -67,6 +68,65 @@ export function useListPoliticians(filters: PoliticianFilters = {}) {
   return useQuery({
     queryKey: ["politicians", filters],
     queryFn: () => fetchPoliticians(filters),
+  });
+}
+
+export interface PoliticianEditData {
+  name: string;
+  political_position: string;
+  political_party: string;
+  tenure_start: string;
+  tenure_end: string;
+  photo_url: string;
+  photo_source_url: string;
+  photo_source_name: string;
+}
+
+export function useUpdatePolitician() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ politician, data }: { politician: Politician; data: PoliticianEditData }) => {
+      if (data.name !== politician.person?.name) {
+        const { error } = await supabase
+          .from("people")
+          .update({ name: data.name })
+          .eq("id", politician.person_id);
+        if (error) throw error;
+      }
+
+      const { error } = await supabase
+        .from("politicians")
+        .update({
+          political_position: data.political_position || null,
+          political_party: data.political_party || null,
+          tenure_start: data.tenure_start ? `${data.tenure_start}-01-01` : null,
+          tenure_end: data.tenure_end ? `${data.tenure_end}-12-31` : null,
+          photo_url: data.photo_url || null,
+          photo_source_url: data.photo_source_url || null,
+          photo_source_name: data.photo_source_name || null,
+        })
+        .eq("person_id", politician.person_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["politicians"] });
+    },
+  });
+}
+
+export function useDeletePolitician() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (personId: string) => {
+      const { error } = await supabase
+        .from("politicians")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("person_id", personId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["politicians"] });
+    },
   });
 }
 

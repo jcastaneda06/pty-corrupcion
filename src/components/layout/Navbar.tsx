@@ -40,7 +40,7 @@ function ThemeToggleButton({ className = '' }: { className?: string }) {
 }
 
 function UserMenu() {
-  const { user, isLoading, signOut, openAuthModal } = useAuth();
+  const { user, isAdmin, isLoading, signOut, openAuthModal } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   if (isLoading) return null;
@@ -69,10 +69,15 @@ function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xs font-bold text-blue-300 hover:bg-blue-500/30 transition-colors"
+          className="relative w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xs font-bold text-blue-300 hover:bg-blue-500/30 transition-colors"
           aria-label="Menú de usuario"
         >
           {getInitials(displayName)}
+          {isAdmin && (
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1 py-px rounded-sm bg-amber-500 text-[9px] font-bold text-black leading-none whitespace-nowrap">
+              ADMIN
+            </span>
+          )}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52 bg-dark-800 border-dark-600">

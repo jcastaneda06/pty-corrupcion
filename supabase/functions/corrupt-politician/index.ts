@@ -12,9 +12,12 @@
  *   represented by an existing entry, preventing duplicate rows.
  *
  * Identity filtering:
- *   People with insufficient identity info (single name token, generic titles,
- *   clearly anonymous references) are skipped. If a person has only one name
- *   token, a Wikipedia search is attempted to resolve their full identity.
+ *   Names are categorized as complete (≥2 real name tokens), partial (1 real
+ *   name token), or invalid (generic role titles, placeholder initials, anonymous
+ *   references). Invalid names are skipped immediately. Partial names are sent to
+ *   Gemini with the finding's title/summary so Gemini can attempt to identify a
+ *   known Panamanian public figure. Wikipedia is used only for confirmed new
+ *   politicians' photo lookup.
  *
  * Recommended cron schedule (set in Supabase pg_cron):
  *   Run 1 — 08:00 Panama time (13:00 UTC):  0 13 * * *
@@ -29,20 +32,50 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-const MAX_PER_RUN = 200;
+const MAX_PER_RUN = 60; // keep well within the 150 s edge-function budget
+const BUDGET_MS = 120_000; // stop scheduling new work at 120 s to leave buffer
 
-// Generic single-word references that are clearly not real person names
-const GENERIC_NAME_PATTERNS = [
-  /^el\s+(ministro|presidente|director|fiscal|magistrado|alcalde|diputado|funcionario|contralor|gerente|rector|secretario)$/i,
-  /^la\s+(ministra|presidenta|directora|fiscal|magistrada|alcaldesa|diputada|funcionaria|contralora|gerente|rectora|secretaria)$/i,
-  /^(un|una)\s+funcionario/i,
-  /^funcionario$/i,
-  /^testigo$/i,
-  /^víctima$/i,
-  /^denunciante$/i,
-  /^fuente$/i,
-  /^informante$/i,
-];
+const ROLE_TITLE_WORDS = new Set([
+  // role/title words
+  "agente","agentes","fiscal","fiscales","funcionario","funcionaria",
+  "funcionarios","funcionarias","diputado","diputada","diputados","diputadas",
+  "ministro","ministra","ministros","ministras","presidente","presidenta",
+  "presidentes","presidentas","director","directora","directores","directoras",
+  "magistrado","magistrada","magistrados","magistradas","alcalde","alcaldesa",
+  "alcaldes","alcaldesas","contralor","contralora","contralores","controladoras",
+  "secretario","secretaria","secretarios","secretarias","rector","rectora",
+  "rectores","rectoras","gerente","gerentes","policía","policías",
+  "servidor","servidora","servidores","servidoras","testigo","testigos",
+  "víctima","víctimas","denunciante","denunciantes","fuente","fuentes",
+  "informante","informantes","sospechoso","sospechosa","sospechosos","sospechosas",
+  "imputado","imputada","imputados","imputadas","oficial","oficiales",
+  "inspector","inspectora","inspectores","inspectoras","subdirector","subdirectora",
+  "viceministro","viceministra","procurador","procuradora","procuradores","procuradoras",
+  "embajador","embajadora","cónsul","cónsules","senador","senadora",
+  "gobernador","gobernadora",
+  // ex- prefixed role titles
+  "exministro","exministra","exdiputado","exdiputada","expresidente","expresidenta",
+  "exdirector","exdirectora","exmagistrado","exmagistrada","exalcalde","exalcaldesa",
+  "exfiscal","exgobernador","exgobernadora","excontralor","excontralora",
+  "exsecretario","exsecretaria","exviceministro","exviceministra",
+  "exprocurador","exprocuradora","exembajador","exembajadora","exrector","exrectora",
+  // collective / anonymous / generic nouns
+  "ciudadano","ciudadana","ciudadanos","ciudadanas",
+  "niño","niña","niños","niñas",
+  "padre","madre","padres","madres","familiar","familiares",
+  "vecino","vecina","vecinos","vecinas","persona","personas",
+  "individuo","individuos","hombre","hombres","mujer","mujeres",
+  "menor","menores","joven","jóvenes","adulto","adultos",
+  "tres","dos","cuatro","cinco","varios","varias","múltiples",
+  "desconocido","desconocida","desconocidos","desconocidas",
+  "identificado","identificada","identificados","identificadas",
+  "anónimo","anónima","anónimos","anónimas",
+]);
+
+const ARTICLE_WORDS = new Set(["el","la","los","las","un","una","unos","unas"]);
+
+// Matches a trailing single uppercase letter (placeholder like "X", "Y", "Z")
+const PLACEHOLDER_PATTERN = /\b[A-Z]\.?$/;
 
 // ── Gemini ────────────────────────────────────────────────────────────────────
 
@@ -103,7 +136,7 @@ async function resolveWikipediaTitle(lang: string, name: string): Promise<string
     `&srlimit=3&format=json&origin=*`;
 
   try {
-    const res = await fetch(searchUrl, { signal: AbortSignal.timeout(6_000) });
+    const res = await fetch(searchUrl, { signal: AbortSignal.timeout(4_000) });
     if (!res.ok) return name;
     const data = await res.json();
     const hits: Array<{ title: string; snippet: string }> = data?.query?.search ?? [];
@@ -130,7 +163,7 @@ async function fetchWikipediaPhoto(name: string): Promise<WikiPhotoData> {
       const title = await resolveWikipediaTitle(lang, name);
       const res = await fetch(
         `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-        { signal: AbortSignal.timeout(8_000) },
+        { signal: AbortSignal.timeout(5_000) },
       );
       if (!res.ok) continue;
       const data = await res.json();
@@ -162,63 +195,58 @@ async function fetchWikipediaPhoto(name: string): Promise<WikiPhotoData> {
   return { photo_url: null, photo_source_url: null, photo_source_name: null };
 }
 
-// ── Identity resolution ───────────────────────────────────────────────────────
+// ── Name categorization ────────────────────────────────────────────────────────
 
-/**
- * Returns true if the name has enough tokens to identify a real person
- * (at least first + last name) and is not a generic title reference.
- */
-function hasCompleteName(name: string): boolean {
+function categorizePersonName(name: string): "complete" | "partial" | "invalid" {
   const trimmed = name.trim();
+  if (trimmed.length < 2) return "invalid";
 
-  // Reject clearly generic references
-  if (GENERIC_NAME_PATTERNS.some((re) => re.test(trimmed))) return false;
+  let tokens = trimmed.split(/\s+/).filter((t) => t.length > 1);
+  if (tokens.length === 0) return "invalid";
 
-  // Require at least 2 word tokens
-  const tokens = trimmed.split(/\s+/).filter((t) => t.length > 1);
-  return tokens.length >= 2;
+  // Strip leading articles (el, la, un, ...)
+  while (tokens.length > 0 && ARTICLE_WORDS.has(tokens[0].toLowerCase())) {
+    tokens = tokens.slice(1);
+  }
+  if (tokens.length === 0) return "invalid";
+
+  // First token is a role/title word → invalid
+  if (ROLE_TITLE_WORDS.has(tokens[0].toLowerCase())) return "invalid";
+
+  // Ends with a single uppercase letter placeholder → invalid
+  if (PLACEHOLDER_PATTERN.test(trimmed)) return "invalid";
+
+  // Count real name tokens (not role words, not articles)
+  const realTokens = tokens.filter(
+    (t) => !ROLE_TITLE_WORDS.has(t.toLowerCase()) && !ARTICLE_WORDS.has(t.toLowerCase()),
+  );
+
+  if (realTokens.length === 0) return "invalid";
+  if (realTokens.length === 1) return "partial";
+  return "complete";
 }
 
-/**
- * Attempts to resolve a single-token name into a full name via Wikipedia search.
- * Returns the resolved full name, or null if we cannot identify the person.
- */
-async function resolvePartialName(
-  name: string,
-  role: string | null,
-): Promise<string | null> {
-  const query = role
-    ? `${name} ${role} Panamá político`
-    : `${name} Panamá político`;
+async function fetchFindingContextForPeople(
+  supabase: ReturnType<typeof createClient>,
+  personIds: string[],
+): Promise<Map<string, { title: string; summary: string | null }>> {
+  const contextMap = new Map<string, { title: string; summary: string | null }>();
+  if (personIds.length === 0) return contextMap;
 
-  const searchUrl =
-    `https://es.wikipedia.org/w/api.php?` +
-    `action=query&list=search&srsearch=${encodeURIComponent(query)}` +
-    `&srlimit=3&format=json&origin=*`;
+  const { data } = await supabase
+    .from("finding_people")
+    .select("person_id, findings(title, summary)")
+    .in("person_id", personIds);
 
-  try {
-    const res = await fetch(searchUrl, { signal: AbortSignal.timeout(6_000) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const hits: Array<{ title: string; snippet: string }> = data?.query?.search ?? [];
-
-    const nameLower = name.toLowerCase();
-    for (const hit of hits) {
-      const titleLower = hit.title.toLowerCase();
-      if (!titleLower.includes(nameLower)) continue;
-
-      // Verify it's a real person entry (title has at least 2 tokens)
-      const tokens = hit.title.trim().split(/\s+/);
-      if (tokens.length >= 2) {
-        console.log(`[identity] Resolved "${name}" → "${hit.title}" via Wikipedia`);
-        return hit.title;
-      }
+  for (const row of data ?? []) {
+    if (!contextMap.has(row.person_id) && row.findings) {
+      contextMap.set(row.person_id, {
+        title: row.findings.title,
+        summary: row.findings.summary ?? null,
+      });
     }
-  } catch {
-    /* ignore */
   }
-
-  return null;
+  return contextMap;
 }
 
 // ── Batch politician classification ──────────────────────────────────────────
@@ -231,6 +259,7 @@ interface ExistingPolitician {
 
 interface GeminiClassification {
   is_politician: boolean;
+  identifiable: boolean;
   political_position: string | null;
   political_party: string | null;
   tenure_start: string | null;
@@ -241,11 +270,14 @@ interface GeminiClassification {
 
 async function classifyPeopleBatch(
   apiKey: string,
-  people: Array<{ id: string; name: string; role: string | null }>,
+  people: Array<{ id: string; name: string; role: string | null; findingContext?: string }>,
   existingPoliticians: ExistingPolitician[],
 ): Promise<Map<string, GeminiClassification>> {
   const list = people
-    .map((p, i) => `[${i}] id=${p.id} | ${p.name} — rol: ${p.role ?? "desconocido"}`)
+    .map((p, i) => {
+      const ctx = p.findingContext ? `\n   Contexto del hallazgo: ${p.findingContext}` : "";
+      return `[${i}] id=${p.id} | ${p.name} — rol: ${p.role ?? "desconocido"}${ctx}`;
+    })
     .join("\n");
 
   const existingList = existingPoliticians.length > 0
@@ -256,6 +288,17 @@ async function classifyPeopleBatch(
 
   const prompt = `Analiza si cada una de las siguientes personas es o fue un político o funcionario público panameño.
 
+REGLA FUNDAMENTAL — NOMBRE COMPLETO OBLIGATORIO:
+Solo puedes marcar "is_politician": true si la persona tiene un nombre completo que incluye
+TANTO un nombre de pila (given name) COMO un apellido (surname) identificables para un
+individuo panameño específico y real. Ejemplos de nombres INVÁLIDOS que deben recibir
+"is_politician": false e "identifiable": false:
+  - Nombres colectivos o genéricos: "Niñas", "Ciudadanos", "Padres", "Víctimas"
+  - Títulos sin nombre: "Exministro de Panamá", "Fiscal", "El diputado"
+  - Referencias anónimas: "Tres ciudadanos no identificados", "Persona desconocida"
+  - Nombres parciales no identificables: "Juan", "García" (sin contexto suficiente)
+  - Cualquier nombre que no corresponda a un individuo real, específico e identificable
+
 POLÍTICOS YA REGISTRADOS EN LA BASE DE DATOS (compara con estos para evitar duplicados):
 ${existingList}
 
@@ -263,14 +306,21 @@ PERSONAS A CLASIFICAR:
 ${list}
 
 Para cada persona a clasificar:
-1. Determina si es o fue político/funcionario público panameño (is_politician).
-2. Si es político, verifica si ya existe en la lista de registrados. Usa el nombre completo y posición política para decidir. Si es la misma persona (aunque el nombre esté escrito diferente o incompleto), devuelve su "person_id" existente en el campo "duplicate_of".
-3. Si no es la misma persona que ninguna registrada, devuelve "duplicate_of": null.
+1. Verifica primero que el nombre sea de un individuo real con nombre + apellido. Si no, marca "is_politician": false e "identifiable": false inmediatamente.
+2. Si el nombre es válido, determina si es o fue político/funcionario público panameño (is_politician).
+3. Si es político, verifica si ya existe en la lista de registrados. Usa el nombre completo y posición política para decidir. Si es la misma persona (aunque el nombre esté escrito diferente o incompleto), devuelve su "person_id" existente en el campo "duplicate_of".
+4. Si no es la misma persona que ninguna registrada, devuelve "duplicate_of": null.
+
+Para personas con nombre PARCIAL (un solo nombre sin apellido o viceversa), usa el "Contexto
+del hallazgo" para intentar identificar a quién se refiere. Si puedes identificar con
+confianza a una persona pública panameña específica y conocida (nombre + apellido), devuelve
+"identifiable": true. Si no, devuelve "identifiable": false e "is_politician": false.
 
 Responde ÚNICAMENTE con un array JSON válido (sin markdown), con exactamente ${people.length} objetos en el mismo orden que las personas a clasificar:
 [
   {
     "is_politician": bool,
+    "identifiable": bool,
     "political_position": string|null,
     "political_party": string|null,
     "tenure_start": "YYYY"|null,
@@ -280,7 +330,7 @@ Responde ÚNICAMENTE con un array JSON válido (sin markdown), con exactamente $
   ...
 ]`;
 
-  const raw = await callGemini(apiKey, prompt, 60_000);
+  const raw = await callGemini(apiKey, prompt, 80_000);
   const match = raw.match(/\[[\s\S]*\]/);
   if (!match) throw new Error(`Gemini returned non-JSON array: ${raw.slice(0, 200)}`);
 
@@ -433,39 +483,53 @@ Deno.serve(async (_req) => {
     });
   }
 
-  // Step 5: filter out people with insufficient identity info
+  // Step 5: categorize people into three buckets
   const rawPeople = candidates ?? [];
-  const people: Array<{ id: string; name: string; role: string | null }> = [];
-  const skippedIds: string[] = [];
+  const completePeople: typeof rawPeople = [];
+  const partialPeople: typeof rawPeople = [];
+  const invalidPeople: typeof rawPeople = [];
 
   for (const person of rawPeople) {
-    if (hasCompleteName(person.name)) {
-      people.push(person);
-      continue;
-    }
+    const cat = categorizePersonName(person.name);
+    if (cat === "complete") completePeople.push(person);
+    else if (cat === "partial") partialPeople.push(person);
+    else invalidPeople.push(person);
+  }
 
-    // Attempt to resolve partial name via Wikipedia
-    const resolved = await resolvePartialName(person.name, person.role);
-    if (resolved) {
-      // Update the name in the DB so future runs use the full name
-      await supabase.from("people").update({ name: resolved }).eq("id", person.id);
-      people.push({ ...person, name: resolved });
-    } else {
-      console.warn(
-        `[corrupt-politician] Skipping "${person.name}" — identity too ambiguous`,
-      );
-      skippedIds.push(person.id);
-      // Mark as processed so we don't retry every run
-      await supabase.from("politicians").upsert(
-        { person_id: person.id, is_processed: true, is_skipped_anonymous: true },
-        { onConflict: "person_id" },
-      );
-    }
+  // Batch-upsert invalid people as skipped (single DB call)
+  if (invalidPeople.length > 0) {
+    await supabase.from("politicians").upsert(
+      invalidPeople.map((p) => ({ person_id: p.id, is_processed: true, is_skipped_anonymous: true })),
+      { onConflict: "person_id" },
+    );
+  }
+  let skippedIds: string[] = invalidPeople.map((p) => p.id);
+
+  // Fetch finding context for partial names
+  const findingContextMap = await fetchFindingContextForPeople(
+    supabase,
+    partialPeople.map((p) => p.id),
+  );
+
+  // Build unified people array for Gemini
+  const people: Array<{ id: string; name: string; role: string | null; findingContext?: string }> = [];
+  for (const p of completePeople) {
+    people.push({ id: p.id, name: p.name, role: p.role });
+  }
+  for (const p of partialPeople) {
+    const ctx = findingContextMap.get(p.id);
+    const findingContext = ctx
+      ? `${ctx.title}${ctx.summary ? " — " + ctx.summary.slice(0, 300) : ""}`
+          .replace(/"/g, "'")
+          .replace(/[\r\n]+/g, " ")
+          .trim()
+      : undefined;
+    people.push({ id: p.id, name: p.name, role: p.role, findingContext });
   }
 
   console.log(
-    `[corrupt-politician] ${people.length} people to classify after identity filtering, ` +
-      `${skippedIds.length} skipped (anonymous)`,
+    `[corrupt-politician] ${completePeople.length} complete, ${partialPeople.length} partial, ` +
+      `${invalidPeople.length} invalid. ${people.length} queued for Gemini.`,
   );
 
   if (people.length === 0) {
@@ -484,17 +548,24 @@ Deno.serve(async (_req) => {
   const classifications = await classifyPeopleBatch(geminiKey, people, existingPoliticians);
   console.log(`[corrupt-politician] Gemini classified ${classifications.size} people`);
 
-  // Step 7: fetch Wikipedia photos in parallel only for confirmed NEW politicians
+  // Step 7: fetch Wikipedia photos in parallel (batched) only for confirmed NEW politicians
   const newPoliticians = people.filter((p) => {
     const c = classifications.get(p.id);
     return c?.is_politician && !c?.duplicate_of;
   });
-  const photoResults = await Promise.all(
-    newPoliticians.map((p) => fetchWikipediaPhoto(p.name)),
-  );
-  const photoMap = new Map<string, WikiPhotoData>(
-    newPoliticians.map((p, i) => [p.id, photoResults[i]]),
-  );
+  const photoMap = new Map<string, WikiPhotoData>();
+  const PHOTO_CONCURRENCY = 10;
+  for (let i = 0; i < newPoliticians.length; i += PHOTO_CONCURRENCY) {
+    if (Date.now() - startTime > BUDGET_MS) {
+      console.warn("[corrupt-politician] Approaching time budget — skipping remaining photo fetches");
+      break;
+    }
+    const batch = newPoliticians.slice(i, i + PHOTO_CONCURRENCY);
+    const results = await Promise.all(batch.map((p) => fetchWikipediaPhoto(p.name)));
+    for (let j = 0; j < batch.length; j++) {
+      photoMap.set(batch[j].id, results[j]);
+    }
+  }
 
   const noPhoto: WikiPhotoData = { photo_url: null, photo_source_url: null, photo_source_name: null };
 
@@ -502,6 +573,18 @@ Deno.serve(async (_req) => {
   for (const person of people) {
     const classification = classifications.get(person.id);
     if (!classification) continue;
+
+    // Partial name Gemini could not identify → skip
+    if ((classification.identifiable ?? true) === false) {
+      console.warn(`[corrupt-politician] Unidentifiable: "${person.name}" — skipping`);
+      await supabase.from("politicians").upsert(
+        { person_id: person.id, is_processed: true, is_skipped_anonymous: true },
+        { onConflict: "person_id" },
+      );
+      skippedIds.push(person.id);
+      processed++;
+      continue;
+    }
 
     // If Gemini identified this as a duplicate of an existing politician, skip insertion
     if (classification.duplicate_of) {

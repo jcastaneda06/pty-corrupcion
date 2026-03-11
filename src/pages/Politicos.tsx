@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { UserRoundCheck, ExternalLink, ArrowLeft } from 'lucide-react';
+import { UserRoundCheck, ExternalLink, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { MarkDuplicateButton } from '../components/duplicates/MarkDuplicateButton';
-import { useListPoliticians, usePoliticianTimeline } from '../hooks/usePoliticians';
+import { EditPoliticianModal } from '../components/politicians/EditPoliticianModal';
+import { useListPoliticians, usePoliticianTimeline, useDeletePolitician } from '../hooks/usePoliticians';
 import { PoliticianFilters } from '../components/politicians/PoliticianFilters';
+import { useAuth } from '../contexts/AuthContext';
 import { SeverityBadge } from '../components/app/SeverityBadge';
 import { MoneyAmount } from '../components/app/MoneyAmount';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { type PoliticianFilters as PoliticianFiltersType, type Politician, type FindingPerson } from '../types';
 import { getInitials, formatDate, formatMoney, SEVERITY_COLORS } from '../lib/utils';
 import { cn } from '@/lib/utils';
@@ -20,52 +25,142 @@ function getCountBadgeColor(count: number): string {
 interface PoliticianItemProps {
   politician: Politician;
   selected: boolean;
+  isAdmin: boolean;
   onClick: () => void;
 }
 
-function PoliticianItem({ politician, selected, onClick }: PoliticianItemProps) {
+function PoliticianItem({ politician, selected, isAdmin, onClick }: PoliticianItemProps) {
   const name = politician.person?.name ?? '';
   const count = politician.finding_count ?? 0;
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const { mutate: deletePolitician, isPending: isDeleting } = useDeletePolitician();
 
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-l-2',
-        selected
-          ? 'bg-dark-700 border-blue-500'
-          : 'border-transparent hover:bg-dark-800'
-      )}
-    >
-      {politician.photo_url ? (
-        <img
-          src={politician.photo_url}
-          alt={name}
-          className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-dark-700"
-        />
-      ) : (
-        <div className="w-9 h-9 rounded-full flex-shrink-0 bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-300">
-          {getInitials(name)}
+    <>
+      <button
+        onClick={onClick}
+        className={cn(
+          'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-l-2',
+          selected
+            ? 'bg-dark-700 border-blue-500'
+            : 'border-transparent hover:bg-dark-800'
+        )}
+      >
+        {politician.photo_url ? (
+          <img
+            src={politician.photo_url}
+            alt={name}
+            className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-dark-700"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full flex-shrink-0 bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-300">
+            {getInitials(name)}
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="text-sm font-semibold text-white truncate">{name}</p>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>{name}</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <p className="text-xs text-gray-500 truncate">{politician.political_position}</p>
         </div>
+
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Badge
+            variant="outline"
+            className={cn('text-xs px-1.5 py-0.5 font-semibold', getCountBadgeColor(count))}
+          >
+            {count}
+          </Badge>
+          <span onClick={(e) => e.stopPropagation()}>
+            <MarkDuplicateButton type="person" subject={politician} />
+          </span>
+          {isAdmin && (
+            <span onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditOpen(true); }}
+                      className="flex items-center justify-center w-6 h-6 rounded text-gray-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors"
+                      aria-label="Editar político"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>Editar</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteOpen(true); }}
+                      className="flex items-center justify-center w-6 h-6 rounded text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                      aria-label="Eliminar político"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>Eliminar</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </span>
+          )}
+        </div>
+      </button>
+
+      {editOpen && (
+        <EditPoliticianModal
+          politician={politician}
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+        />
       )}
 
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-white truncate">{name}</p>
-        <p className="text-xs text-gray-500 truncate">{politician.political_position}</p>
-      </div>
-
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <Badge
-          variant="outline"
-          className={cn('text-xs px-1.5 py-0.5 font-semibold', getCountBadgeColor(count))}
+      <Dialog open={deleteOpen} onOpenChange={(v) => !v && setDeleteOpen(false)}>
+        <DialogContent
+          className="bg-dark-800 border-dark-700 text-white max-w-sm"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !isDeleting) {
+              deletePolitician(politician.person_id, { onSuccess: () => setDeleteOpen(false) });
+            }
+          }}
         >
-          {count}
-        </Badge>
-        <span onClick={(e) => e.stopPropagation()}>
-          <MarkDuplicateButton type="person" subject={politician} />
-        </span>
-      </div>
-    </button>
+          <DialogHeader>
+            <DialogTitle className="text-white text-base">Eliminar político</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-400 mt-1">
+            ¿Estás seguro de que quieres eliminar a{' '}
+            <span className="text-white font-semibold">{name}</span>? Esta acción se puede revertir desde la base de datos.
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeleteOpen(false)}
+              className="text-gray-400 hover:text-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              disabled={isDeleting}
+              onClick={() => deletePolitician(politician.person_id, { onSuccess: () => setDeleteOpen(false) })}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Eliminar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -259,6 +354,7 @@ function ListPanel({
   onFiltersChange,
   politicians,
   isLoading,
+  isAdmin,
   selectedPersonId,
   onSelect,
 }: {
@@ -266,6 +362,7 @@ function ListPanel({
   onFiltersChange: (f: PoliticianFiltersType) => void;
   politicians: Politician[];
   isLoading: boolean;
+  isAdmin: boolean;
   selectedPersonId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -302,6 +399,7 @@ function ListPanel({
               key={p.id}
               politician={p}
               selected={p.person_id === selectedPersonId}
+              isAdmin={isAdmin}
               onClick={() => onSelect(p.person_id)}
             />
           ))
@@ -335,6 +433,7 @@ export function Politicos() {
     setSearchParams(params, { replace: true });
   }, [filters, selectedPersonId, setSearchParams]);
 
+  const { isAdmin } = useAuth();
   const { data: politicians = [], isLoading } = useListPoliticians(filters);
   const { data: timeline = [], isLoading: timelineLoading } = usePoliticianTimeline(selectedPersonId);
 
@@ -363,6 +462,7 @@ export function Politicos() {
           onFiltersChange={setFilters}
           politicians={politicians}
           isLoading={isLoading}
+          isAdmin={isAdmin}
           selectedPersonId={selectedPersonId}
           onSelect={handleSelect}
         />
