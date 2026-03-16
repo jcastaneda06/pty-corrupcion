@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
-import { type Politician, type PoliticianFilters, type FindingPerson } from "../types";
+import { type Politician, type PoliticianFilters, type FindingPerson, type DeepSearchResult } from "../types";
 
 async function fetchPoliticians(filters: PoliticianFilters = {}): Promise<Politician[]> {
   let query = supabase
@@ -135,5 +135,46 @@ export function usePoliticianTimeline(personId: string | null) {
     queryKey: ["politician-timeline", personId],
     queryFn: () => fetchPoliticianTimeline(personId!),
     enabled: !!personId,
+  });
+}
+
+const DEEP_SEARCH_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/deep-search`;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+export function useDeepSearch() {
+  return useMutation({
+    mutationFn: async (name: string): Promise<DeepSearchResult> => {
+      const res = await fetch(DEEP_SEARCH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ANON_KEY}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error(`Deep search failed: ${res.status}`);
+      return res.json();
+    },
+  });
+}
+
+export function useConfirmDeepSearch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ name, result }: { name: string; result: DeepSearchResult }) => {
+      const res = await fetch(DEEP_SEARCH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ANON_KEY}`,
+        },
+        body: JSON.stringify({ name, confirm: true, person: result.person, findings: result.findings }),
+      });
+      if (!res.ok) throw new Error(`Confirm failed: ${res.status}`);
+      return res.json() as Promise<{ saved: boolean; person_id: string; finding_ids: string[] }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["politicians"] });
+    },
   });
 }

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { UserRoundCheck, ExternalLink, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { UserRoundCheck, ExternalLink, ArrowLeft, Pencil, Trash2, Search, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { MarkDuplicateButton } from '../components/duplicates/MarkDuplicateButton';
 import { EditPoliticianModal } from '../components/politicians/EditPoliticianModal';
-import { useListPoliticians, usePoliticianTimeline, useDeletePolitician } from '../hooks/usePoliticians';
+import { useListPoliticians, usePoliticianTimeline, useDeletePolitician, useDeepSearch, useConfirmDeepSearch } from '../hooks/usePoliticians';
 import { PoliticianFilters } from '../components/politicians/PoliticianFilters';
 import { useAuth } from '../contexts/AuthContext';
 import { SeverityBadge } from '../components/app/SeverityBadge';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { type PoliticianFilters as PoliticianFiltersType, type Politician, type FindingPerson } from '../types';
+import { type PoliticianFilters as PoliticianFiltersType, type Politician, type FindingPerson, type DeepSearchResult, type DeepSearchPreviewFinding } from '../types';
 import { getInitials, formatDate, formatMoney, SEVERITY_COLORS } from '../lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -349,6 +349,250 @@ function PoliticianDetail({ politician, timeline, timelineLoading, onBack }: Pol
   );
 }
 
+// ── Deep Search UI components ─────────────────────────────────────────────────
+
+function DeepSearchPrompt({ name, onSearch, isSearching }: { name: string; onSearch: () => void; isSearching: boolean }) {
+  return (
+    <div className="p-4 text-center space-y-3">
+      <p className="text-gray-500 text-sm">No se encontraron políticos</p>
+      <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 space-y-3">
+        <p className="text-gray-400 text-sm leading-relaxed">
+          No hay resultados actualmente para esta persona. ¿Quieres hacer una búsqueda profunda?
+        </p>
+        <Button
+          size="sm"
+          onClick={onSearch}
+          disabled={isSearching}
+          className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+        >
+          {isSearching ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Buscando...
+            </>
+          ) : (
+            <>
+              <Search className="w-4 h-4" />
+              Búsqueda profunda de &ldquo;{name}&rdquo;
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DeepSearchPreviewItem({
+  result,
+  selected,
+  onClick,
+}: {
+  result: DeepSearchResult;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const { person } = result;
+  return (
+    <div className="border-t border-dark-700 pt-1">
+      <p className="px-3 py-1 text-xs text-blue-400 font-medium">Resultado de búsqueda profunda</p>
+      <button
+        onClick={onClick}
+        className={cn(
+          'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-l-2',
+          selected ? 'bg-dark-700 border-blue-500' : 'border-transparent hover:bg-dark-800',
+        )}
+      >
+        {person.photo_url ? (
+          <img
+            src={person.photo_url}
+            alt={person.name}
+            className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-dark-700"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full flex-shrink-0 bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-300">
+            {getInitials(person.name)}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white truncate">{person.name}</p>
+          <p className="text-xs text-gray-500 truncate">{person.political_position ?? 'Político'}</p>
+        </div>
+        <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-blue-500/40 text-blue-400 flex-shrink-0">
+          {result.findings.length} casos
+        </Badge>
+      </button>
+    </div>
+  );
+}
+
+function DeepSearchPreviewDetail({
+  result,
+  searchName,
+  onConfirm,
+  onDismiss,
+  isConfirming,
+  onBack,
+}: {
+  result: DeepSearchResult;
+  searchName: string;
+  onConfirm: () => void;
+  onDismiss: () => void;
+  isConfirming: boolean;
+  onBack?: () => void;
+}) {
+  const { person, findings } = result;
+  const tenureLabel = (() => {
+    if (person.tenure_start && person.tenure_end) return `${person.tenure_start} – ${person.tenure_end}`;
+    if (person.tenure_start) return `Desde ${person.tenure_start}`;
+    return null;
+  })();
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="md:hidden flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors -mt-1 mb-1"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Políticos
+        </button>
+      )}
+
+      {/* Confirmation banner */}
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="text-white font-semibold text-sm">¿Es esto lo que buscabas?</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Estos resultados no están guardados aún. Si confirmas, &ldquo;{searchName}&rdquo; y sus casos
+              serán almacenados en la base de datos.
+            </p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              onClick={onConfirm}
+              disabled={isConfirming}
+              className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+            >
+              {isConfirming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+              Sí, guardar
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onDismiss}
+              disabled={isConfirming}
+              className="text-gray-400 hover:text-white gap-1.5"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              No
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Person header */}
+      <div className="bg-dark-800 rounded-xl p-5 border border-dark-700">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            {person.photo_url ? (
+              <img src={person.photo_url} alt={person.name} className="w-20 h-20 rounded-full object-cover bg-dark-700" />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-2xl font-bold text-blue-300">
+                {getInitials(person.name)}
+              </div>
+            )}
+            {person.photo_source_url && (
+              <a
+                href={person.photo_source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-400 transition-colors mt-1"
+              >
+                <ExternalLink className="w-2.5 h-2.5" />
+                {person.photo_source_name ?? 'Wikipedia'}
+              </a>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-white">{person.name}</h1>
+            {person.political_position && (
+              <p className="text-blue-400 font-medium mt-0.5">{person.political_position}</p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2 text-sm text-gray-400">
+              {person.political_party && (
+                <span className="bg-dark-700 px-2 py-0.5 rounded text-xs">{person.political_party}</span>
+              )}
+              {tenureLabel && <span className="text-xs text-gray-500">{tenureLabel}</span>}
+            </div>
+          </div>
+        </div>
+        {person.bio && (
+          <div className="border-t border-dark-700 mt-4 pt-4">
+            <p className="text-sm text-gray-400 leading-relaxed">{person.bio}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Findings */}
+      <div>
+        <h2 className="text-base font-semibold text-white mb-4">
+          Hallazgos encontrados
+          {findings.length > 0 && <span className="text-gray-500 font-normal ml-2">({findings.length})</span>}
+        </h2>
+        {findings.length === 0 ? (
+          <p className="text-gray-500 text-sm">No se encontraron hallazgos de corrupción relacionados.</p>
+        ) : (
+          <div className="space-y-3">
+            {findings.map((finding: DeepSearchPreviewFinding, i: number) => (
+              <div
+                key={i}
+                className="bg-dark-800 border border-dark-700 rounded-xl p-4"
+                style={{ borderLeftColor: SEVERITY_COLORS[finding.severity], borderLeftWidth: 2 }}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <p className="text-sm font-medium text-white">{finding.title}</p>
+                  <SeverityBadge severity={finding.severity} size="sm" />
+                </div>
+                <p className="text-xs text-gray-400 line-clamp-3 leading-relaxed mb-2">{finding.summary}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-dark-600 text-gray-400">
+                    {finding.category}
+                  </Badge>
+                  {finding.amount_usd != null && (
+                    <MoneyAmount amount={finding.amount_usd} className="text-xs" />
+                  )}
+                  {finding.date_occurred && (
+                    <span className="text-xs text-gray-600">{formatDate(finding.date_occurred)}</span>
+                  )}
+                </div>
+                {finding.sources.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {finding.sources.slice(0, 2).map((s, si) => (
+                      <a
+                        key={si}
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-500 hover:text-blue-400 flex items-center gap-0.5"
+                      >
+                        <ExternalLink className="w-2.5 h-2.5" />
+                        {s.outlet ?? s.title ?? 'Fuente'}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ListPanel({
   filters,
   onFiltersChange,
@@ -357,6 +601,11 @@ function ListPanel({
   isAdmin,
   selectedPersonId,
   onSelect,
+  deepSearchResult,
+  isPreviewSelected,
+  onSelectPreview,
+  onDeepSearch,
+  isDeepSearching,
 }: {
   filters: PoliticianFiltersType;
   onFiltersChange: (f: PoliticianFiltersType) => void;
@@ -365,7 +614,15 @@ function ListPanel({
   isAdmin: boolean;
   selectedPersonId: string | null;
   onSelect: (id: string) => void;
+  deepSearchResult: DeepSearchResult | null;
+  isPreviewSelected: boolean;
+  onSelectPreview: () => void;
+  onDeepSearch: () => void;
+  isDeepSearching: boolean;
 }) {
+  const showDeepSearchPrompt =
+    !isLoading && politicians.length === 0 && !!filters.search && !deepSearchResult;
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-dark-700">
@@ -389,20 +646,34 @@ function ListPanel({
               </div>
             ))}
           </div>
-        ) : politicians.length === 0 ? (
-          <div className="p-4 text-center text-gray-600 text-sm">
-            No se encontraron políticos
-          </div>
         ) : (
-          politicians.map((p) => (
-            <PoliticianItem
-              key={p.id}
-              politician={p}
-              selected={p.person_id === selectedPersonId}
-              isAdmin={isAdmin}
-              onClick={() => onSelect(p.person_id)}
-            />
-          ))
+          <>
+            {politicians.map((p) => (
+              <PoliticianItem
+                key={p.id}
+                politician={p}
+                selected={p.person_id === selectedPersonId}
+                isAdmin={isAdmin}
+                onClick={() => onSelect(p.person_id)}
+              />
+            ))}
+
+            {showDeepSearchPrompt && (
+              <DeepSearchPrompt
+                name={filters.search ?? ''}
+                onSearch={onDeepSearch}
+                isSearching={isDeepSearching}
+              />
+            )}
+
+            {deepSearchResult && (
+              <DeepSearchPreviewItem
+                result={deepSearchResult}
+                selected={isPreviewSelected}
+                onClick={onSelectPreview}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
@@ -423,6 +694,19 @@ export function Politicos() {
     searchParams.get('persona'),
   );
 
+  // Deep search state
+  const [deepSearchResult, setDeepSearchResult] = useState<DeepSearchResult | null>(null);
+  const [isPreviewSelected, setIsPreviewSelected] = useState(false);
+
+  const { mutate: runDeepSearch, isPending: isDeepSearching } = useDeepSearch();
+  const { mutate: confirmDeepSearch, isPending: isConfirming } = useConfirmDeepSearch();
+
+  // Reset deep search results when the search query changes
+  useEffect(() => {
+    setDeepSearchResult(null);
+    setIsPreviewSelected(false);
+  }, [filters.search]);
+
   useEffect(() => {
     const params: Record<string, string> = {};
     if (filters.search) params.search = filters.search;
@@ -439,8 +723,45 @@ export function Politicos() {
 
   const selectedPolitician = politicians.find((p) => p.person_id === selectedPersonId) ?? null;
 
-  const handleSelect = (personId: string) => setSelectedPersonId(personId);
-  const handleBack = () => setSelectedPersonId(null);
+  const handleSelect = (personId: string) => {
+    setSelectedPersonId(personId);
+    setIsPreviewSelected(false);
+  };
+  const handleBack = () => {
+    setSelectedPersonId(null);
+    setIsPreviewSelected(false);
+  };
+
+  const handleDeepSearch = () => {
+    if (!filters.search) return;
+    runDeepSearch(filters.search, {
+      onSuccess: (data) => {
+        setDeepSearchResult(data);
+        setIsPreviewSelected(true);
+      },
+    });
+  };
+
+  const handleConfirm = () => {
+    if (!deepSearchResult || !filters.search) return;
+    confirmDeepSearch(
+      { name: filters.search, result: deepSearchResult },
+      {
+        onSuccess: () => {
+          setDeepSearchResult(null);
+          setIsPreviewSelected(false);
+          setFilters((f) => ({ ...f })); // trigger re-fetch
+        },
+      },
+    );
+  };
+
+  const handleDismiss = () => {
+    setDeepSearchResult(null);
+    setIsPreviewSelected(false);
+  };
+
+  const anyDetailVisible = !!selectedPersonId || isPreviewSelected;
 
   // Mobile: two-screen flow — list OR detail
   // Desktop: sidebar + main split
@@ -451,8 +772,7 @@ export function Politicos() {
       <aside
         className={cn(
           'md:flex md:w-72 md:flex-shrink-0 md:border-r md:border-dark-700 md:flex-col md:overflow-hidden',
-          // Mobile: fill full screen when no politician selected, hide when one is
-          selectedPersonId
+          anyDetailVisible
             ? 'hidden md:flex'
             : 'flex flex-col h-[calc(100vh-3.5rem)]'
         )}
@@ -465,17 +785,31 @@ export function Politicos() {
           isAdmin={isAdmin}
           selectedPersonId={selectedPersonId}
           onSelect={handleSelect}
+          deepSearchResult={deepSearchResult}
+          isPreviewSelected={isPreviewSelected}
+          onSelectPreview={() => { setIsPreviewSelected(true); setSelectedPersonId(null); }}
+          onDeepSearch={handleDeepSearch}
+          isDeepSearching={isDeepSearching}
         />
       </aside>
 
-      {/* Detail panel — hidden on mobile when no politician selected */}
+      {/* Detail panel — hidden on mobile when nothing selected */}
       <main
         className={cn(
           'flex-1 md:overflow-y-auto',
-          !selectedPersonId && 'hidden md:flex md:items-center md:justify-center'
+          !anyDetailVisible && 'hidden md:flex md:items-center md:justify-center'
         )}
       >
-        {selectedPolitician ? (
+        {isPreviewSelected && deepSearchResult ? (
+          <DeepSearchPreviewDetail
+            result={deepSearchResult}
+            searchName={filters.search ?? ''}
+            onConfirm={handleConfirm}
+            onDismiss={handleDismiss}
+            isConfirming={isConfirming}
+            onBack={handleBack}
+          />
+        ) : selectedPolitician ? (
           <PoliticianDetail
             politician={selectedPolitician}
             timeline={timeline}

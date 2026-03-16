@@ -153,6 +153,50 @@ export interface PoliticianFilters {
   dateTo?: string;
 }
 
+// ── Deep Search (preview before saving to DB) ─────────────────────────────────
+
+export interface DeepSearchPreviewSource {
+  url: string;
+  title: string | null;
+  outlet: string | null;
+  published_at: string | null;
+}
+
+export interface DeepSearchPreviewPerson {
+  name: string;
+  role_in_case: string | null;
+  amount_usd: number | null;
+  is_convicted: boolean;
+}
+
+export interface DeepSearchPreviewFinding {
+  title: string;
+  summary: string;
+  severity: Severity;
+  category: string;
+  amount_usd: number | null;
+  date_occurred: string | null;
+  sources: DeepSearchPreviewSource[];
+  people: DeepSearchPreviewPerson[];
+}
+
+export interface DeepSearchPreviewPolitician {
+  name: string;
+  political_position: string | null;
+  political_party: string | null;
+  tenure_start: string | null;
+  tenure_end: string | null;
+  bio: string | null;
+  photo_url: string | null;
+  photo_source_url: string | null;
+  photo_source_name: string | null;
+}
+
+export interface DeepSearchResult {
+  person: DeepSearchPreviewPolitician;
+  findings: DeepSearchPreviewFinding[];
+}
+
 export interface DuplicateMerge {
   id: string;
   type: 'finding' | 'person';
