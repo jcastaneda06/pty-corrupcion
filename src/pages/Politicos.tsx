@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { UserRoundCheck, ExternalLink, ArrowLeft, Pencil, Trash2, Search, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { MarkDuplicateButton } from '../components/duplicates/MarkDuplicateButton';
@@ -351,7 +351,80 @@ function PoliticianDetail({ politician, timeline, timelineLoading, onBack }: Pol
 
 // ── Deep Search UI components ─────────────────────────────────────────────────
 
-function DeepSearchPrompt({ name, onSearch, isSearching }: { name: string; onSearch: () => void; isSearching: boolean }) {
+const SEARCH_STEPS = [
+  { label: 'Buscando noticias en la prensa...', duration: 4000 },
+  { label: 'Leyendo artículos relevantes...', duration: 7000 },
+  { label: 'La IA está investigando el caso...', duration: 12000 },
+  { label: 'Verificando identidad y cargos...', duration: 8000 },
+  { label: 'Buscando foto en Wikipedia...', duration: 5000 },
+  { label: 'Compilando resultados...', duration: Infinity },
+];
+
+function DeepSearchProgress() {
+  const [stepIndex, setStepIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setStepIndex(0);
+    setVisible(true);
+  }, []);
+
+  useEffect(() => {
+    const step = SEARCH_STEPS[stepIndex];
+    if (step.duration === Infinity) return;
+
+    timerRef.current = setTimeout(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setStepIndex((i) => Math.min(i + 1, SEARCH_STEPS.length - 1));
+        setVisible(true);
+      }, 300);
+    }, step.duration);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [stepIndex]);
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="bg-dark-800 border border-blue-500/20 rounded-xl p-4 space-y-4">
+        {/* Animated bar */}
+        <div className="flex items-center gap-3">
+          <Loader2 className="w-4 h-4 text-blue-400 animate-spin flex-shrink-0" />
+          <div className="flex-1 h-1 bg-dark-700 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: `${((stepIndex + 1) / SEARCH_STEPS.length) * 100}%`, transition: 'width 0.6s ease' }} />
+          </div>
+        </div>
+
+        {/* Step label */}
+        <p
+          className="text-sm text-gray-300 text-center transition-opacity duration-300"
+          style={{ opacity: visible ? 1 : 0 }}
+        >
+          {SEARCH_STEPS[stepIndex].label}
+        </p>
+
+        {/* Completed steps */}
+        <div className="space-y-1.5">
+          {SEARCH_STEPS.slice(0, stepIndex).map((step, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 flex-shrink-0" />
+              {step.label}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeepSearchPrompt({ onSearch, isSearching }: { onSearch: () => void; isSearching: boolean }) {
+  if (isSearching) {
+    return <DeepSearchProgress />;
+  }
+
   return (
     <div className="p-4 text-center space-y-3">
       <p className="text-gray-500 text-sm">No se encontraron políticos</p>
@@ -362,20 +435,10 @@ function DeepSearchPrompt({ name, onSearch, isSearching }: { name: string; onSea
         <Button
           size="sm"
           onClick={onSearch}
-          disabled={isSearching}
           className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
         >
-          {isSearching ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Buscando...
-            </>
-          ) : (
-            <>
-              <Search className="w-4 h-4" />
-              Búsqueda profunda de &ldquo;{name}&rdquo;
-            </>
-          )}
+          <Search className="w-4 h-4" />
+          Búsqueda profunda
         </Button>
       </div>
     </div>
@@ -660,7 +723,6 @@ function ListPanel({
 
             {showDeepSearchPrompt && (
               <DeepSearchPrompt
-                name={filters.search ?? ''}
                 onSearch={onDeepSearch}
                 isSearching={isDeepSearching}
               />
@@ -717,7 +779,7 @@ export function Politicos() {
     setSearchParams(params, { replace: true });
   }, [filters, selectedPersonId, setSearchParams]);
 
-  const { isAdmin } = useAuth();
+  const { isAdmin, user, openAuthModal } = useAuth();
   const { data: politicians = [], isLoading } = useListPoliticians(filters);
   const { data: timeline = [], isLoading: timelineLoading } = usePoliticianTimeline(selectedPersonId);
 
@@ -734,6 +796,10 @@ export function Politicos() {
 
   const handleDeepSearch = () => {
     if (!filters.search) return;
+    if (!user) {
+      openAuthModal();
+      return;
+    }
     runDeepSearch(filters.search, {
       onSuccess: (data) => {
         setDeepSearchResult(data);
