@@ -352,8 +352,8 @@ function PoliticianDetail({ politician, timeline, timelineLoading, onBack }: Pol
 // ── Deep Search UI components ─────────────────────────────────────────────────
 
 const SEARCH_STEPS = [
-  { label: 'Buscando noticias en la prensa...', duration: 4000 },
-  { label: 'Leyendo artículos relevantes...', duration: 7000 },
+  { label: 'Buscando noticias en la web...', duration: 5000 },
+  { label: 'Leyendo artículos relevantes...', duration: 8000 },
   { label: 'La IA está investigando el caso...', duration: 12000 },
   { label: 'Verificando identidad y cargos...', duration: 8000 },
   { label: 'Buscando foto en Wikipedia...', duration: 5000 },
